@@ -24,7 +24,7 @@ Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will
 ```
 MIT License
 
-Copyright (c) 2021 Jay
+Copyright (c) 2021 Jay (jay94ks@gmail.com)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
