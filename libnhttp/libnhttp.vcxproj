@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{5c48d52a-2bac-42c8-8eea-ab47fd83e6c6}</ProjectGuid>
+    <RootNamespace>libnhttp</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
+    <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
+    <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
+    <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
+    <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>__NHTTP_BUILD__;__NHTTP_STATIC__;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>__NHTTP_BUILD__;__NHTTP_STATIC__;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>__NHTTP_BUILD__;__NHTTP_STATIC__;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>__NHTTP_BUILD__;__NHTTP_STATIC__;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="nhttp\asyncs\context.cpp" />
+    <ClCompile Include="nhttp\asyncs\task.cpp" />
+    <ClCompile Include="nhttp\depends\wepoll\wepoll.c" />
+    <ClCompile Include="nhttp\hal\barrior_t.cpp" />
+    <ClCompile Include="nhttp\hal\epoll_raw_t.cpp" />
+    <ClCompile Include="nhttp\hal\event_t.cpp" />
+    <ClCompile Include="nhttp\hal\os\winapi.cpp" />
+    <ClCompile Include="nhttp\hal\socket_raw_t.cpp" />
+    <ClCompile Include="nhttp\net\base\listener_base.cpp" />
+    <ClCompile Include="nhttp\net\socket_watcher.cpp" />
+    <ClCompile Include="nhttp\protocol\http_date.cpp" />
+    <ClCompile Include="nhttp\protocol\http_form_data.cpp" />
+    <ClCompile Include="nhttp\protocol\http_header.cpp" />
+    <ClCompile Include="nhttp\protocol\http_headerset.cpp" />
+    <ClCompile Include="nhttp\protocol\http_mime_type.cpp" />
+    <ClCompile Include="nhttp\protocol\http_query_string.cpp" />
+    <ClCompile Include="nhttp\protocol\http_resource.cpp" />
+    <ClCompile Include="nhttp\protocol\http_status.cpp" />
+    <ClCompile Include="nhttp\server\extensions\http_extension.cpp" />
+    <ClCompile Include="nhttp\server\extensions\http_overlay.cpp" />
+    <ClCompile Include="nhttp\server\extensions\http_vfile.cpp" />
+    <ClCompile Include="nhttp\server\extensions\http_vpath.cpp" />
+    <ClCompile Include="nhttp\server\extensions\http_vhost.cpp" />
+    <ClCompile Include="nhttp\server\http_listener.cpp" />
+    <ClCompile Include="nhttp\server\http_raw_listener.cpp" />
+    <ClCompile Include="nhttp\server\internals\http_raw_link.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Makefile" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="nhttp\assert.hpp" />
+    <ClInclude Include="nhttp\asyncs\context.hpp" />
+    <ClInclude Include="nhttp\asyncs\future.hpp" />
+    <ClInclude Include="nhttp\asyncs\future_task.hpp" />
+    <ClInclude Include="nhttp\asyncs\task.hpp" />
+    <ClInclude Include="nhttp\depends\utf8.h" />
+    <ClInclude Include="nhttp\depends\wepoll\wepoll.h" />
+    <ClInclude Include="nhttp\hal\barrior_t.hpp" />
+    <ClInclude Include="nhttp\hal\epoll_raw_t.hpp" />
+    <ClInclude Include="nhttp\hal\event_t.hpp" />
+    <ClInclude Include="nhttp\hal\os\posix.hpp" />
+    <ClInclude Include="nhttp\hal\os\winapi.hpp" />
+    <ClInclude Include="nhttp\hal\rwlock_t.hpp" />
+    <ClInclude Include="nhttp\hal\socket_raw_t.hpp" />
+    <ClInclude Include="nhttp\hal\spinlock_t.hpp" />
+    <ClInclude Include="nhttp\io\file_stream.hpp" />
+    <ClInclude Include="nhttp\io\memory_stream.hpp" />
+    <ClInclude Include="nhttp\io\range_stream.hpp" />
+    <ClInclude Include="nhttp\io\stream.hpp" />
+    <ClInclude Include="nhttp\net\base\listener_base.hpp" />
+    <ClInclude Include="nhttp\net\base\session_base.hpp" />
+    <ClInclude Include="nhttp\net\endpoint.hpp" />
+    <ClInclude Include="nhttp\net\socket.hpp" />
+    <ClInclude Include="nhttp\net\socket_watcher.hpp" />
+    <ClInclude Include="nhttp\nvalue.hpp" />
+    <ClInclude Include="nhttp\protocol\http_date.hpp" />
+    <ClInclude Include="nhttp\protocol\http_form_data.hpp" />
+    <ClInclude Include="nhttp\protocol\http_header.hpp" />
+    <ClInclude Include="nhttp\protocol\http_headerset.hpp" />
+    <ClInclude Include="nhttp\protocol\http_method.hpp" />
+    <ClInclude Include="nhttp\protocol\http_mime_type.hpp" />
+    <ClInclude Include="nhttp\protocol\http_query_string.hpp" />
+    <ClInclude Include="nhttp\protocol\http_status.hpp" />
+    <ClInclude Include="nhttp\server\extensions\http_extension.hpp" />
+    <ClInclude Include="nhttp\server\extensions\http_overlay.hpp" />
+    <ClInclude Include="nhttp\server\extensions\http_vfile.hpp" />
+    <ClInclude Include="nhttp\server\extensions\http_vpath.hpp" />
+    <ClInclude Include="nhttp\server\extensions\http_vhost.hpp" />
+    <ClInclude Include="nhttp\server\http_context.hpp" />
+    <ClInclude Include="nhttp\server\http_listener.hpp" />
+    <ClInclude Include="nhttp\server\http_params.hpp" />
+    <ClInclude Include="nhttp\server\http_raw_listener.hpp" />
+    <ClInclude Include="nhttp\server\http_raw_context.hpp" />
+    <ClInclude Include="nhttp\server\http_link.hpp" />
+    <ClInclude Include="nhttp\server\http_server.hpp" />
+    <ClInclude Include="nhttp\server\http_taggable.hpp" />
+    <ClInclude Include="nhttp\server\internals\http_chunked_alloc.hpp" />
+    <ClInclude Include="nhttp\server\internals\http_chunked_buffer.hpp" />
+    <ClInclude Include="nhttp\server\internals\http_raw_request_content.hpp" />
+    <ClInclude Include="nhttp\server\internals\http_raw_link.hpp" />
+    <ClInclude Include="nhttp\types.hpp" />
+    <ClInclude Include="nhttp\protocol\http_resource.hpp" />
+    <ClInclude Include="nhttp\utils\defaultify.hpp" />
+    <ClInclude Include="nhttp\utils\instrusive.hpp" />
+    <ClInclude Include="nhttp\utils\path.hpp" />
+    <ClInclude Include="nhttp\utils\lambda_t.hpp" />
+    <ClInclude Include="nhttp\utils\strings.hpp" />
+    <ClInclude Include="nhttp\utils\urlencode.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="nhttp\depends\wepoll\LICENSE" />
+    <None Include="nhttp\depends\wepoll\README.md" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

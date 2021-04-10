@@ -1,0 +1,314 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="nhttp\protocol\http_headerset.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\protocol\http_header.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\protocol\http_status.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\protocol\http_date.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\protocol\http_mime_type.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\hal\socket_raw_t.cpp">
+      <Filter>nhttp\hal</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\hal\epoll_raw_t.cpp">
+      <Filter>nhttp\hal</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\net\socket_watcher.cpp">
+      <Filter>nhttp\net</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\hal\event_t.cpp">
+      <Filter>nhttp\hal</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\hal\barrior_t.cpp">
+      <Filter>nhttp\hal</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\hal\os\winapi.cpp">
+      <Filter>nhttp\hal\os</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\asyncs\context.cpp">
+      <Filter>nhttp\asyncs</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\asyncs\task.cpp">
+      <Filter>nhttp\asyncs</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\depends\wepoll\wepoll.c">
+      <Filter>nhttp\depends\wepoll</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\protocol\http_query_string.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\protocol\http_form_data.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\protocol\http_resource.cpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\net\base\listener_base.cpp">
+      <Filter>nhttp\net\base</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\http_raw_listener.cpp">
+      <Filter>nhttp\server</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\http_listener.cpp">
+      <Filter>nhttp\server</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\extensions\http_vhost.cpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\extensions\http_overlay.cpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\extensions\http_vpath.cpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\internals\http_raw_link.cpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\extensions\http_vfile.cpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\extensions\http_extension.cpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Makefile" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="nhttp">
+      <UniqueIdentifier>{604fd96f-021b-4932-a951-a8dbd23c2323}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\protocol">
+      <UniqueIdentifier>{e5a0f97c-fdd8-43fe-ad3b-fa84faf113b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\server">
+      <UniqueIdentifier>{83d89a04-867c-4331-93f4-971fa7257035}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\depends">
+      <UniqueIdentifier>{478c0436-1672-4442-baff-15d0cc9b488a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\io">
+      <UniqueIdentifier>{156a8062-64ab-4d50-9a21-07e08b64c696}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\hal">
+      <UniqueIdentifier>{b8c40c53-fa33-49a7-b127-eaf7df1cd319}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\utils">
+      <UniqueIdentifier>{73effec8-8a68-4a3e-b6e7-eddf1bcc9ed1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\hal\os">
+      <UniqueIdentifier>{87b80f45-f235-44b1-9106-f44eaa99b8b1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\net">
+      <UniqueIdentifier>{2f1a884c-6840-4fc6-909f-708c9245d799}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\asyncs">
+      <UniqueIdentifier>{142ad2fa-2eb0-4d31-bd7b-9a70e42825ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\depends\wepoll">
+      <UniqueIdentifier>{f6c017c3-d0d8-40f0-b3eb-0cd110bad389}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\server\internals">
+      <UniqueIdentifier>{0d0ca58f-a66b-4f10-ae68-f25b52fb8b7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\net\base">
+      <UniqueIdentifier>{e80806fc-9cc8-43a4-b667-e4429c58d4f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\server\extensions">
+      <UniqueIdentifier>{040bef45-9124-402b-b3b2-947b191a7571}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="nhttp\types.hpp">
+      <Filter>nhttp</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_headerset.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_header.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_method.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_resource.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_status.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_date.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_mime_type.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\depends\utf8.h">
+      <Filter>nhttp\depends</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\io\stream.hpp">
+      <Filter>nhttp\io</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\io\file_stream.hpp">
+      <Filter>nhttp\io</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\io\range_stream.hpp">
+      <Filter>nhttp\io</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\spinlock_t.hpp">
+      <Filter>nhttp\hal</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\utils\strings.hpp">
+      <Filter>nhttp\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\utils\urlencode.hpp">
+      <Filter>nhttp\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\utils\defaultify.hpp">
+      <Filter>nhttp\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\utils\instrusive.hpp">
+      <Filter>nhttp\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\event_t.hpp">
+      <Filter>nhttp\hal</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\os\winapi.hpp">
+      <Filter>nhttp\hal\os</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\os\posix.hpp">
+      <Filter>nhttp\hal\os</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\barrior_t.hpp">
+      <Filter>nhttp\hal</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\socket_raw_t.hpp">
+      <Filter>nhttp\hal</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\epoll_raw_t.hpp">
+      <Filter>nhttp\hal</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\assert.hpp">
+      <Filter>nhttp</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\net\endpoint.hpp">
+      <Filter>nhttp\net</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\net\socket.hpp">
+      <Filter>nhttp\net</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\net\socket_watcher.hpp">
+      <Filter>nhttp\net</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\asyncs\context.hpp">
+      <Filter>nhttp\asyncs</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\asyncs\future.hpp">
+      <Filter>nhttp\asyncs</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\asyncs\task.hpp">
+      <Filter>nhttp\asyncs</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\asyncs\future_task.hpp">
+      <Filter>nhttp\asyncs</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\depends\wepoll\wepoll.h">
+      <Filter>nhttp\depends\wepoll</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_query_string.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\protocol\http_form_data.hpp">
+      <Filter>nhttp\protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\nvalue.hpp">
+      <Filter>nhttp</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\net\base\listener_base.hpp">
+      <Filter>nhttp\net\base</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\net\base\session_base.hpp">
+      <Filter>nhttp\net\base</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_raw_context.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\http_chunked_buffer.hpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\http_chunked_alloc.hpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_raw_listener.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_params.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\http_raw_request_content.hpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_listener.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\io\memory_stream.hpp">
+      <Filter>nhttp\io</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\extensions\http_extension.hpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\extensions\http_vhost.hpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\extensions\http_overlay.hpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\utils\path.hpp">
+      <Filter>nhttp\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\extensions\http_vpath.hpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\utils\lambda_t.hpp">
+      <Filter>nhttp\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\extensions\http_vfile.hpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_taggable.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_context.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_link.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\http_raw_link.hpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\hal\rwlock_t.hpp">
+      <Filter>nhttp\hal</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_server.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="nhttp\depends\wepoll\LICENSE">
+      <Filter>nhttp\depends\wepoll</Filter>
+    </None>
+    <None Include="nhttp\depends\wepoll\README.md">
+      <Filter>nhttp\depends\wepoll</Filter>
+    </None>
+  </ItemGroup>
+</Project>
