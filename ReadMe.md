@@ -7,6 +7,8 @@ Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will
 
 **Table of contents**
 
+* [License](#license)
+* [Dependency Licenses](#dependency-licenses)
 * [Quickstart example](#quickstart-example)
 * [Pure Socket Server Library](#pure-socket-server-library)
 	* [Socket](#socket)
@@ -45,7 +47,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Dependency Licenses.
+## Dependency Licenses
 1. utfcpp: http://utfcpp.sourceforge.net/ (Boost Software License)
 2. wepoll: https://github.com/piscisaureus/wepoll (Copyright: Custom)
 both licenses are MIT compatible, but follows each library's license.
