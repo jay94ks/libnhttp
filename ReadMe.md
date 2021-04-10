@@ -50,6 +50,7 @@ SOFTWARE.
 ## Dependency Licenses
 1. utfcpp: http://utfcpp.sourceforge.net/ (Boost Software License)
 2. wepoll: https://github.com/piscisaureus/wepoll (Copyright: Custom)
+
 both licenses are MIT compatible, but follows each library's license.
 
 **PLEASE READ THEIR LICENSE FILES**
