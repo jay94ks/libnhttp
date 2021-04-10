@@ -158,6 +158,9 @@ namespace server {
 			if (read <= 0) {
 				int32_t err = socket.get_errno();
 
+				if (err == EINTR)
+					return EVENT_RETRY;
+
 				if (err == EAGAIN || err == EWOULDBLOCK) {
 					if (time(nullptr) - timestamp >= params.timeout) {
 						current->response.status.set(408); // 408 Request Timeout.
@@ -437,6 +440,9 @@ namespace server {
 
 				if (read <= 0) {
 					int32_t err = socket.get_errno();
+
+					if (err == EINTR)
+						continue;
 
 					if (err == EAGAIN || err == EWOULDBLOCK) {
 						receives.read_more = 0;
@@ -779,6 +785,9 @@ namespace server {
 			if (read <= 0) {
 				int32_t err = content->get_errno();
 
+				if (err == EINTR)
+					return EVENT_RETRY;
+
 				if (err == EWOULDBLOCK)
 					return EVENT_AGAIN;
 
@@ -815,6 +824,9 @@ namespace server {
 
 			if (sent <= 0) {
 				int32_t err = socket.get_errno();
+
+				if (err == EINTR)
+					return EVENT_RETRY;
 
 				if (err == EAGAIN || err == EWOULDBLOCK) {
 					return EVENT_AGAIN;
