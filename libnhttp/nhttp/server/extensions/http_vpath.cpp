@@ -14,11 +14,7 @@ namespace server {
 		const auto& req = subpath_of(context);
 
 		if (req.size() >= base_path.size()) {
-			if (strnicmp(req.c_str(), base_path.c_str(), base_path.size()))
-				return false;
-
-			char ch = req[base_path.size()];
-			if (!ch || ch == '/')
+			if (!strnicmp(req.c_str(), base_path.c_str(), base_path.size()))
 				return true;
 		}
 

@@ -30,12 +30,14 @@ namespace server {
 		std::string base_path;
 
 	public:
+		http_vpath() { }
 		http_vpath(std::string path);
 		virtual ~http_vpath() { }
 
 	private:
 		virtual bool on_collect(std::shared_ptr<http_context> context) override;
 
+	protected:
 		/* called before calling the on_handle method, test if it can be handled. */
 		virtual bool on_enter(std::shared_ptr<http_context> context) override;
 

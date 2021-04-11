@@ -36,6 +36,17 @@ namespace nhttp {
 	}
 #endif
 
+	inline auto strnicmp(const char* left, const std::string& right) {
+		return strnicmp(left, right.c_str(), right.size());
+	}
+
+	inline auto strcmp_x(const std::string& left, const std::string& right) {
+		if (left.size() <= right.size())
+			return strncmp(left.c_str(), right.c_str(), right.size());
+
+		return strncmp(left.c_str(), right.c_str(), left.size());
+	}
+
 	inline int64_t to_int64(const char* str, int32_t radix = 10, size_t max = -1) {
 		int64_t n = 0;
 

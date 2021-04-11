@@ -75,7 +75,7 @@ class http_link;
 		inline const http_headers& get_headers() const { return raw->response.headers; }
 
 		/* get request body stream. (read only) */
-		inline const std::shared_ptr<stream>& get_request_body() const { return raw->response.content; }
+		inline const std::shared_ptr<stream>& get_request_body() const { return raw->request.content; }
 	};
 
 	/**
@@ -164,6 +164,7 @@ class http_link;
 		http_request_ptr request;
 		http_response_ptr response;
 		std::shared_ptr<http_link> link;
+		std::shared_ptr<http_taggable> global;
 
 	public:
 		/* determines this context has closed or not. */

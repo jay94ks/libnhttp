@@ -35,8 +35,10 @@ namespace nhttp {
 			const char* lf_b = lf;
 
 			while (col < lf && (*lf == ' ' || *lf == '\t' || *lf == '\r' || *lf == '\n')) { --lf; }
+			++lf;
+
 			if (col < lf) {
-				dst.set_value(std::string(col, size_t(lf - col + 1)));
+				dst.set_value(std::string(col, size_t(lf - col)));
 			}
 
 			return int32_t(lf_b - src_o + 1);

@@ -24,7 +24,7 @@ namespace nhttp {
 		}
 
 		template<typename lambda_type>
-		lambda_t(lambda_type&& lambda) {
+		lambda_t(lambda_type lambda) {
 			using l_ret_type = decltype(std::declval<lambda_type>()(std::declval<types>() ...));
 			static_assert(
 				std::is_convertible<l_ret_type, ret_type>::value,
@@ -33,7 +33,7 @@ namespace nhttp {
 
 			callable = new lambda_type(std::move(lambda));
 			call = [](void* p, types&& ... args) { return (*(lambda_type*)p)(std::forward<types>(args) ...); };
-			clone = [](void* p) { return new lambda_type(*(lambda_type*)p); };
+			clone = [](void* p) { return (void*) new lambda_type(*(lambda_type*)p); };
 			dtor = [](void* p) { delete (lambda_type*)p; };
 		}
 
@@ -85,7 +85,7 @@ namespace nhttp {
 		/**
 		 * call assigned predicate.
 		 */
-		inline ret_type operator()(types&& ... args) {
+		inline ret_type operator()(types ... args) {
 			NHTTP_INIT_ASSERT(callable,
 				"tried to call uninitialized predicate!");
 

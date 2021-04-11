@@ -7,6 +7,7 @@ namespace server {
 
 	class http_extension;
 	class http_context;
+	class http_taggable;
 	struct http_extension_registry;
 
 	/**
@@ -17,6 +18,7 @@ namespace server {
 	private:
 		std::atomic<bool> flag_dtor;
 		std::shared_ptr<http_extension_registry> registry;
+		std::shared_ptr<http_taggable> global_tags;
 
 		hal::rwlock_t rwlock;
 		hal::event_lite_t event;

@@ -181,6 +181,10 @@
     <ClCompile Include="nhttp\server\http_listener.cpp" />
     <ClCompile Include="nhttp\server\http_raw_listener.cpp" />
     <ClCompile Include="nhttp\server\internals\http_raw_link.cpp" />
+    <ClCompile Include="nhttp\server\xfwk\xfwk_facade.cpp" />
+    <ClCompile Include="nhttp\server\xfwk\xfwk_middleware.cpp" />
+    <ClCompile Include="nhttp\server\xfwk\xfwk_route.cpp" />
+    <ClCompile Include="nhttp\server\xfwk\xfwk_router.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Makefile" />
@@ -236,6 +240,13 @@
     <ClInclude Include="nhttp\server\internals\http_chunked_buffer.hpp" />
     <ClInclude Include="nhttp\server\internals\http_raw_request_content.hpp" />
     <ClInclude Include="nhttp\server\internals\http_raw_link.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk_facade.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk_middleware.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk_path.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk_route.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk_router.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk_target.hpp" />
     <ClInclude Include="nhttp\types.hpp" />
     <ClInclude Include="nhttp\protocol\http_resource.hpp" />
     <ClInclude Include="nhttp\utils\defaultify.hpp" />
@@ -243,6 +254,7 @@
     <ClInclude Include="nhttp\utils\path.hpp" />
     <ClInclude Include="nhttp\utils\lambda_t.hpp" />
     <ClInclude Include="nhttp\utils\strings.hpp" />
+    <ClInclude Include="nhttp\utils\this_ptr.hpp" />
     <ClInclude Include="nhttp\utils\urlencode.hpp" />
   </ItemGroup>
   <ItemGroup>

@@ -79,6 +79,18 @@
     <ClCompile Include="nhttp\server\extensions\http_extension.cpp">
       <Filter>nhttp\server\extensions</Filter>
     </ClCompile>
+    <ClCompile Include="nhttp\server\xfwk\xfwk_router.cpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\xfwk\xfwk_middleware.cpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\xfwk\xfwk_facade.cpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\xfwk\xfwk_route.cpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Makefile" />
@@ -125,6 +137,9 @@
     </Filter>
     <Filter Include="nhttp\server\extensions">
       <UniqueIdentifier>{040bef45-9124-402b-b3b2-947b191a7571}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\server\xfwk">
+      <UniqueIdentifier>{bd18a71a-c12f-4b30-99ee-93201e640ee5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -301,6 +316,30 @@
     </ClInclude>
     <ClInclude Include="nhttp\server\http_server.hpp">
       <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk_router.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk_path.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\utils\this_ptr.hpp">
+      <Filter>nhttp\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk_target.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk_middleware.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk_facade.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk_route.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

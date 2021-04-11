@@ -108,5 +108,29 @@ namespace nhttp {
 
 		/* close stream. */
 		virtual void close() { }
+
+	public:
+		inline bool read_all(std::string& out_string) {
+			size_t old_size = out_string.size();
+
+			while (!is_end_of()) {
+				char temp[1024];
+
+				int32_t bytes = read(temp, sizeof(temp));
+
+				if (bytes <= 0) {
+					int32_t err = get_errno();
+
+					if (err == EINTR || err == EWOULDBLOCK)
+						continue;
+
+					break;
+				}
+
+				out_string.append(temp, bytes);
+			}
+
+			return old_size != out_string.size();
+		}
 	};
 }

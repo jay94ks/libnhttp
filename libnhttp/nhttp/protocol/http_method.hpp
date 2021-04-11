@@ -73,6 +73,12 @@ namespace nhttp {
 		inline bool operator ==(const well_known_t& w) const { return well_id >= 0 ? well_id == w._1 : name == w._2; }
 		inline bool operator !=(const well_known_t& w) const { return well_id >= 0 ? well_id != w._1 : name != w._2; }
 
+		/* for std::map. */
+		inline bool operator <=(const http_method& m) const { return flags && m.flags ? well_id <= m.well_id : stricmp(name.c_str(), m.name.c_str()) <= 0; }
+		inline bool operator >=(const http_method& m) const { return flags && m.flags ? well_id >= m.well_id : stricmp(name.c_str(), m.name.c_str()) >= 0; }
+		inline bool operator < (const http_method& m) const { return flags && m.flags ? well_id <  m.well_id : stricmp(name.c_str(), m.name.c_str()) <  0; }
+		inline bool operator > (const http_method& m) const { return flags && m.flags ? well_id >  m.well_id : stricmp(name.c_str(), m.name.c_str()) >  0; }
+
 	public:
 		inline bool is(uint8_t flag) const { return (flags & flag) != 0; }
 		inline bool is_invalid() const { return !name.size(); }

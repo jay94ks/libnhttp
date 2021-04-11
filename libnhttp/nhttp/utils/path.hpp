@@ -64,9 +64,9 @@ namespace nhttp {
 		}
 
 		if (!slash)
-			return std::string(in);
+			return std::string(in_b, size_t(in_e - in_b));
 
-		names.resize(slash);
+		names.resize(slash + 1);
 		while (in_b < in_e) {
 			const char* sep = (const char*) memchr(in_b, '/', size_t(in_e - in_b));
 
@@ -96,6 +96,8 @@ namespace nhttp {
 			size_t i = uses++;
 			names[i].string = in_b;
 			names[i].length = size_t(sep - in_b);
+
+			in_b = sep + 1;
 		}
 
 		if (!uses)

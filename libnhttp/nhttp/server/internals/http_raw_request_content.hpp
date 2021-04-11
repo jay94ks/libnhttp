@@ -40,7 +40,7 @@ namespace server {
 		/* determines currently at end of stream. */
 		virtual bool is_end_of() const override {
 			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			return buffer == nullptr || (avail_bytes <= 0 && is_end);
+			return buffer == nullptr || (avail_bytes <= 0 && is_end) || !total_bytes;
 		}
 
 		/* determines this stream is based on non-blocking or not. */

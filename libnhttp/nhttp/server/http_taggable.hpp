@@ -1,5 +1,6 @@
 #pragma once
 #include "../types.hpp"
+#include "../hal/rwlock_t.hpp"
 
 namespace nhttp {
 namespace server {
@@ -68,6 +69,7 @@ namespace _ {
 		};
 
 	protected:
+		mutable hal::rwlock_t lock;
 		std::map<size_t, tag_type> tags;
 		std::vector<http_hook_tag*> hooks;
 
@@ -88,19 +90,41 @@ namespace _ {
 		 */
 		template<typename type>
 		inline type* ensured_tag() {
-			type* tag = get_tag_ptr<type>();
-			if (!tag) { tag = set_tag<type>(); }
-			return tag;
+			type* tag_ptr = nullptr;
+			lock.lock_write();
+
+			const auto& place = tags.find(typeid(type).hash_code());
+
+			if (place == tags.end()) {
+				tag_type tag;
+
+				tag.data = tag_ptr = new type();
+				tag.dtor = [](void* p) { delete (type*)p; };
+				tag.hook = to_http_tag((type*)tag.data);
+
+				set_tag_void(typeid(type).hash_code(), tag);
+			}
+
+			else tag_ptr = (type*) place->second.data;
+
+			lock.unlock_write();
+			return tag_ptr;
 		}
 
 		/* get tag object pointer. */
 		template<typename type>
 		inline type* get_tag_ptr() const {
+			lock.lock_read();
 			const auto& place = tags.find(typeid(type).hash_code());
 
-			if (place != tags.end())
-				return (type*)place->second.data;
+			if (place != tags.end()) {
+				auto* tag = (type*)place->second.data;
+				lock.unlock_read();
 
+				return tag;
+			}
+
+			lock.unlock_read();
 			return nullptr;
 		}
 
@@ -113,7 +137,10 @@ namespace _ {
 			tag.dtor = [](void* p) { delete (type*)p; };
 			tag.hook = to_http_tag((type*)tag.data);
 
+			lock.lock_write();
 			set_tag_void(typeid(type).hash_code(), tag);
+			lock.unlock_write();
+
 			return (type*)tag.data;
 		}
 
@@ -126,7 +153,10 @@ namespace _ {
 			tag.dtor = [](void* p) { delete (type*)p; };
 			tag.hook = to_http_tag((type*)tag.data);
 
+			lock.lock_write();
 			set_tag_void(typeid(type).hash_code(), tag);
+			lock.unlock_write();
+
 			return (type*)tag.data;
 		}
 
@@ -139,12 +169,21 @@ namespace _ {
 			tag.dtor = [](void* p) { delete (type*)p; };
 			tag.hook = to_http_tag((type*)tag.data);
 
+			lock.lock_write();
 			set_tag_void(typeid(type).hash_code(), tag);
+			lock.unlock_write();
+
 			return (type*)tag.data;
 		}
 
 		template<typename type>
-		inline bool unset() { return unset_tag(typeid(type).hash_code()); }
+		inline bool unset() {
+			lock.lock_write();
+			bool ret = unset_tag(typeid(type).hash_code());
+			lock.unlock_write();
+
+			return ret;
+		}
 
 	private:
 		inline bool unset_tag(size_t id) {
