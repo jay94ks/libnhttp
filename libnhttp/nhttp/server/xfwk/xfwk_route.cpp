@@ -99,7 +99,7 @@ namespace xfwk {
 	std::shared_ptr<xfwk_wildcard_route> xfwk_route::add_wildcard() {
 		auto newbie = std::make_shared<xfwk_wildcard_route>();
 
-		remove_child(name);
+		remove_child("*");
 		add_child(newbie);
 
 		return newbie;
