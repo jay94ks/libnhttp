@@ -22,6 +22,10 @@ Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will
 		* [Http Response](#http-response)
 	* [Http Taggable](#http-taggable)
 	* [X Framework](#x-framework)
+		* [xfwk_router extension](#xfwk_router-extension)
+		* [xfwk_facade interface](#xfwk_facade-interface)
+		* [xfwk_middleware interface](#xfwk_middleware-interface)
+		* [xfwk_target interface](#xfwk_target-interface)
 
 ## License
 ```
@@ -333,7 +337,7 @@ excluding query string. just `http_extension` and `http_listener`, `event loop` 
 
 So, I've prepared a simple framework for that easily works.
 
-#### Router
+#### xfwk_router extension
 Router is root node of `xfwk_route` and it is a `http_extension`, implements `xfwk_facade`.
 
 ```
@@ -384,4 +388,138 @@ router->param("/:user", [](const std::string& value) {
 router->any("/:any", [](http_request_ptr) {
 	return make_response("he (or she) isn't allowed to read this page!");
 });
+```
+
+#### xfwk_facade interface
+Detail of the `xfwk_facade` is:
+```
+class NHTTP_API xfwk_facade {
+public:
+	virtual ~xfwk_facade() { }
+
+protected:
+	/* get route of base path. */
+	virtual std::shared_ptr<xfwk_route> get_route() const = 0;
+
+	/* get or set middleware stack. @warn: DO NOT set under routing process! */
+	virtual std::shared_ptr<xfwk_middleware_stack> get_middlewares() const = 0;
+	virtual void set_middlewares(const std::shared_ptr<xfwk_middleware_stack>& middlewares) = 0;
+
+public:
+	/* set target to HEAD, OPTIONS, GET, POST, PUT, DELETE, PATCH methods. */
+	virtual this_ptr<xfwk_facade> any(std::shared_ptr<xfwk_target> target);
+	inline this_ptr<xfwk_facade> head(std::shared_ptr<xfwk_target> target)								{ return method(http_method::HEAD, target); }
+	inline this_ptr<xfwk_facade> options(std::shared_ptr<xfwk_target> target)							{ return method(http_method::OPTIONS, target); }
+	inline this_ptr<xfwk_facade> get(std::shared_ptr<xfwk_target> target)								{ return method(http_method::GET, target); }
+	inline this_ptr<xfwk_facade> post(std::shared_ptr<xfwk_target> target)								{ return method(http_method::POST, target); }
+	inline this_ptr<xfwk_facade> put(std::shared_ptr<xfwk_target> target)								{ return method(http_method::PUT, target); }
+	inline this_ptr<xfwk_facade> patch(std::shared_ptr<xfwk_target> target)								{ return method(http_method::PATCH, target); }
+	inline this_ptr<xfwk_facade> delet(std::shared_ptr<xfwk_target> target)								{ return method(http_method::DELETE, target); }
+
+	/* set target for path to HEAD, OPTIONS, GET, POST, PUT, DELETE, PATCH methods. */
+	virtual this_ptr<xfwk_facade> any(const std::string& path, std::shared_ptr<xfwk_target> target);
+	inline this_ptr<xfwk_facade> head(const std::string path, std::shared_ptr<xfwk_target> target)		{ return method(http_method::HEAD, path, target); }
+	inline this_ptr<xfwk_facade> options(const std::string path, std::shared_ptr<xfwk_target> target)	{ return method(http_method::OPTIONS, path, target); }
+	inline this_ptr<xfwk_facade> get(const std::string path, std::shared_ptr<xfwk_target> target)		{ return method(http_method::GET, path, target); }
+	inline this_ptr<xfwk_facade> post(const std::string path, std::shared_ptr<xfwk_target> target)		{ return method(http_method::POST, path, target); }
+	inline this_ptr<xfwk_facade> put(const std::string path, std::shared_ptr<xfwk_target> target)		{ return method(http_method::PUT, path, target); }
+	inline this_ptr<xfwk_facade> patch(const std::string path, std::shared_ptr<xfwk_target> target)		{ return method(http_method::PATCH, path, target); }
+	inline this_ptr<xfwk_facade> delet(const std::string path, std::shared_ptr<xfwk_target> target)		{ return method(http_method::DELETE, path, target); }
+
+	/* set target for specific method. */
+	virtual this_ptr<xfwk_facade> method(const http_method& method, std::shared_ptr<xfwk_target> target);
+	virtual this_ptr<xfwk_facade> method(const http_method& method, const std::string& path, std::shared_ptr<xfwk_target> target);
+
+	/* get target of specific method. */
+	std::shared_ptr<xfwk_target> method(const http_method& method);
+	std::shared_ptr<xfwk_target> method(const http_method& method, const std::string& path);
+
+	/* set parameter's test predicate. */
+	this_ptr<xfwk_facade> param(const std::string& name, lambda_t<bool(const std::string&)> predicate);
+
+	/* prepend or append a middleware on the stack. */
+	virtual this_ptr<xfwk_facade> prepend(std::shared_ptr<xfwk_middleware> middleware);
+	virtual this_ptr<xfwk_facade> append(std::shared_ptr<xfwk_middleware> middleware);
+
+	/* make a grouped route. */
+	virtual std::shared_ptr<xfwk_facade> group(lambda_t<void(std::shared_ptr<xfwk_facade>)> lambda);
+};
+```
+
+#### xfwk_middleware interface
+This is an interface for filtering or pre-handling an request before real handler.
+
+```
+class NHTTP_API xfwk_middleware {
+	friend class xfwk_middleware_stack;
+
+public:
+	typedef http_response_ptr(* next_type)(http_request_ptr request);
+	virtual ~xfwk_middleware() { }
+
+public:
+	/* handle target using this middleware. */
+	http_response_ptr handle_for(http_request_ptr request, const std::shared_ptr<xfwk_target>& target) const;
+
+protected:
+	/* handle target. */
+	virtual http_response_ptr handle(http_request_ptr request, next_type next) const = 0;
+};
+```
+
+As a example, you can read `xfwk_middleware_stack` class.
+
+1. https://github.com/jay94ks/libnhttp/blob/main/libnhttp/nhttp/server/xfwk/xfwk_middleware.hpp
+2. https://github.com/jay94ks/libnhttp/blob/main/libnhttp/nhttp/server/xfwk/xfwk_middleware.cpp
+
+#### xfwk_target interface
+This is an interface for implementing the real handler for the end-point.
+You can inherit it yourself or use already implemented targets.
+
+```
+class NHTTP_API xfwk_target : public xfwk_facade_middlewares {
+private:
+	std::shared_ptr<xfwk_middleware_stack> middlewares;
+		
+public:
+	virtual ~xfwk_target() { }
+
+public:
+	/**
+		* -- xfwk_facade_middlewares interface --
+		* get or set middleware stack. @warn: DO NOT set under routing process!
+		*/
+	virtual std::shared_ptr<xfwk_middleware_stack> get_middlewares() const override { return middlewares; }
+	virtual void set_middlewares(const std::shared_ptr<xfwk_middleware_stack>& middlewares) override { this->middlewares = middlewares; }
+
+public:
+	/* determines this target is unified or not. */
+	virtual bool is_unifed() const { return false; }
+
+	/* handle request and generate response. */
+	virtual http_response_ptr handle(http_request_ptr request) const = 0;
+};
+```
+
+**already implemented targets:**
+```
+/* 1. Lambda as target. */
+target_by([](http_request_ptr req) {
+	/* ... */
+});
+
+/* 2. Method as target. */
+class my_controller {
+public:
+	http_response_ptr hello(http_request_ptr p) {
+		return make_response("hello world!");
+	}
+};
+
+target_by(my_ctrl, &my_controller::hello)
+
+/* 3. Unified target. */
+auto unified = std::make_shared<xfwk_unified_target>();
+
+unified->set_target_for(http_method::GET, target_by(...));
 ```
