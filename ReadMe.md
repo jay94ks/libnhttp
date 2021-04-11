@@ -21,6 +21,7 @@ Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will
 		* [Http Request](#http-request)
 		* [Http Response](#http-response)
 	* [Http Taggable](#http-taggable)
+	* [X Framework](#x-framework)
 
 ## License
 ```
@@ -321,4 +322,66 @@ void http_vhost::on_leave(std::shared_ptr<http_context> context) {
 		tag->vhosts.pop();
 	}
 }
+```
+
+### X Framework
+X-Framework is for writing REST API or using MVC pattern easily in C++.
+Basically, `libnhttp` doesn't parse anything from request, 
+excluding query string. just `http_extension` and `http_listener`, `event loop` only are there.
+
+**Writing a Web service under that API, it's so tired.**
+
+So, I've prepared a simple framework for that easily works.
+
+#### Router
+Router is root node of `xfwk_route` and it is a `http_extension`, implements `xfwk_facade`.
+
+```
+auto router = std::make_shared<xfwk_router>();
+
+/* it should be `std::shared_ptr` for registering it as extension. */
+listener.extends(router);
+
+/* or you can register it on some vhost. */
+example_com.extends(router);
+
+/* of course, twice are available. */
+example_xyz.extends(router);
+```
+
+**Laravel-like router facades** allows you write API easily.
+```
+/* registers '/whoami' `path` handler for GET method. */
+router->get("whoami", target_by([](http_request_ptr) {
+	return make_response("I'm jay.");
+}));
+
+/* registers '/:user' path parameter handler for GET method. */
+router->get("/:user", target_by([](http_request_ptr req) {
+	std::string user = route_of(req).captures[":user"];
+	return make_response(user + " is ...");
+}));
+
+/* registers '/:user' path parameter handler for POST method. */
+router->post("/:user", target_by([](http_request_ptr req) {
+	std::string user = route_of(req).captures[":user"];
+	std::string body;
+
+	/* request body is `binary` stream object. */
+	if (!req->get_request_body()->read_all(body))
+		return make_response(400);
+		
+	return make_response(user + " says " + body);
+}));
+
+/* and the parameters can be filtered by predicate: */
+/* and if the request filtered out, it will be fail down to next node. */
+router->param("/:user", [](const std::string& value) {
+	/* user name should be jay or kay. */
+	return value == "jay" || value == "kay";
+});
+
+router->any("/:any", [](http_request_ptr) {
+	return make_response("he (or she) isn't allowed to read this page!");
+});
 ```
