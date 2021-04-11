@@ -5,8 +5,10 @@ Event-driven, streaming HTTP server implementation written in C++.
 This HTTP library provides re-usable implementations for an HTTP server in C++ for `Windows` and `POSIX` operating systems.
 Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will be implemented soon.
 
-** Table of contents **
+**Table of contents**
 
+* [License](#license)
+* [Dependency Licenses](#dependency-licenses)
 * [Quickstart example](#quickstart-example)
 * [Pure Socket Server Library](#pure-socket-server-library)
 	* [Socket](#socket)
@@ -20,6 +22,40 @@ Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will
 		* [Http Response](#http-response)
 	* [Http Taggable](#http-taggable)
 
+## License
+```
+MIT License
+
+Copyright (c) 2021 Jay (jay94ks@gmail.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Dependency Licenses
+1. utfcpp: http://utfcpp.sourceforge.net/ (Boost Software License)
+2. wepoll: https://github.com/piscisaureus/wepoll (Copyright: Custom)
+
+both licenses are MIT compatible, but follows each library's license.
+
+**PLEASE READ THEIR LICENSE FILES**
+1. utfcpp: https://github.com/jay94ks/libnhttp/blob/main/libnhttp/nhttp/depends/utf8.h
+2. wepoll: https://github.com/jay94ks/libnhttp/tree/main/libnhttp/nhttp/depends/wepoll
 
 ## Quickstart example
 ```
