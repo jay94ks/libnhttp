@@ -6,6 +6,8 @@ namespace nhttp {
 namespace server {
 	class http_raw_link;
 	class http_chunked_buffer;
+	class http_raw_chunked_content_handler;
+	class http_raw_fixed_len_content_handler;
 
 	/**
 	 * class http_raw_request_content.
@@ -13,6 +15,8 @@ namespace server {
 	 */
 	class NHTTP_API http_raw_request_content : public stream {
 		friend class http_raw_link;
+		friend class http_raw_chunked_content_handler;
+		friend class http_raw_fixed_len_content_handler;
 
 	protected:
 		mutable hal::spinlock_t spinlock;

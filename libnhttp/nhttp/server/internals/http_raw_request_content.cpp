@@ -196,6 +196,7 @@ namespace server {
 		}
 
 		set_errno(ENOENT);
+		return 0;
 	}
 
 }

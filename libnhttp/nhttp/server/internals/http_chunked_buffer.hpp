@@ -174,10 +174,10 @@ namespace server {
 				}
 
 				avail = len > avail ? avail : len;
-				memcpy(buf, tail->head + tail->left, avail);
+				memcpy(buf, head->head + head->left, avail);
 				
 				read_len += avail;
-				tail->left += avail;
+				head->left += avail;
 
 				buf = (uint8_t*)buf + avail;
 				len -= avail;

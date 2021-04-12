@@ -52,15 +52,19 @@ namespace nhttp {
 
 		while (*str && max--) {
 			int64_t c = *str++;
+
+			if (!std::isalnum(c))
+				break;
+
 			n *= radix;
 
 			if (c >= '0' && c <= '9')
 				n += (c - '0');
 
-			else if (c >= 'a')
+			else if (c >= 'a' && c <= 'z')
 				n += (c - 'a') + 10;
 
-			else if (c >= 'A')
+			else if (c >= 'A' && c <= 'Z')
 				n += (c - 'A') + 10;
 
 			else break;

@@ -6,6 +6,7 @@
 #include "../http_params.hpp"
 #include "../http_link.hpp"
 #include "http_chunked_buffer.hpp"
+#include "http_raw_content_handler.hpp"
 
 namespace nhttp {
 	class stream;
@@ -49,7 +50,6 @@ namespace server {
 		std::atomic<int8_t> context_state;
 		std::shared_ptr<http_raw_context> current;
 		std::shared_ptr<http_chunked_buffer> buffer;
-		std::shared_ptr<http_raw_request_content> current_feed;
 		std::shared_ptr<http_link> link;
 		std::shared_ptr<stream> content;
 
@@ -57,20 +57,10 @@ namespace server {
 		future<void> future_holder;
 		std::vector<char> line_buf;
 
+		/* content handler. */
+		http_raw_content_handler* content_handler;
+
 	private:
-		enum {
-			CONT_NONE = 0,
-			CONT_FIXED,
-			CONT_CHUNKED,
-			CONT_WEBSOCKET
-		};
-
-		enum {
-			CONP_HEADER = 0,
-			CONP_BODY,
-			CONP_BODY_END
-		};
-
 		struct {
 			int8_t has_done    : 1;
 			int8_t has_target  : 1;
@@ -82,19 +72,7 @@ namespace server {
 
 		struct {
 			int8_t keep_alive  : 1;
-
 			int8_t has_raised  : 1;
-			int8_t cont_skip   : 1;
-			int8_t cont_type   : 3; /* 0: none, 1: fixed_len, 2: chunked, 3: websocket. */
-			int8_t cont_phase  : 2; /* 0: header, 1: body, 2: body-end */
-
-			int8_t cont_mask   : 1;
-			int8_t cont_opcd   : 4;
-			int8_t cont_push   : 1;
-
-			uint64_t cont_left;
-			uint64_t cont_read;
-			uint64_t cont_mark;
 		} contexts;
 
 		struct {

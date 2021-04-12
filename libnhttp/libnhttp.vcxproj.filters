@@ -100,6 +100,12 @@
     <ClCompile Include="nhttp\server\internals\http_raw_request_content.cpp">
       <Filter>nhttp\server\internals</Filter>
     </ClCompile>
+    <ClCompile Include="nhttp\server\internals\contents\http_raw_fixed_length_content_handler.cpp">
+      <Filter>nhttp\server\internals\contents</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\internals\contents\http_raw_chunked_content.cpp">
+      <Filter>nhttp\server\internals\contents</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Makefile" />
@@ -152,6 +158,9 @@
     </Filter>
     <Filter Include="nhttp\depends\sha1">
       <UniqueIdentifier>{4a61f662-d6b2-4e99-8958-146e4f93a92c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\server\internals\contents">
+      <UniqueIdentifier>{2102c883-ee96-45d5-8b36-f49aeaf3d22a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -367,6 +376,12 @@
     </ClInclude>
     <ClInclude Include="nhttp\server\internals\http_raw_content_handler.hpp">
       <Filter>nhttp\server\internals</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\contents\http_raw_fixed_length_content_handler.hpp">
+      <Filter>nhttp\server\internals\contents</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\contents\http_raw_chunked_content_handler.hpp">
+      <Filter>nhttp\server\internals\contents</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
