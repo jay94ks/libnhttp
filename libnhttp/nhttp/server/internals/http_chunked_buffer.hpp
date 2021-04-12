@@ -113,6 +113,43 @@ namespace server {
 			return read_len;
 		}
 
+		/* peek bytes from buffer. */
+		inline size_t peek(void* buf, size_t len) {
+			std::lock_guard<decltype(spinlock)> guard(spinlock);
+			size_t read_len = 0;
+
+			auto head = this->head;
+
+			while (len) {
+				size_t avail = head->right - head->left;
+
+				if (!avail) {
+					auto* next = head->next;
+
+					if (!next) {
+						break;
+					}
+
+					total -= head->size;
+					head = next;
+					continue;
+				}
+
+				avail = len > avail ? avail : len;
+				memcpy(buf, tail->head + tail->left, avail);
+
+				read_len += avail;
+
+				buf = (uint8_t*)buf + avail;
+				len -= avail;
+
+				length -= avail;
+
+			}
+
+			return read_len;
+		}
+
 		/* read bytes from buffer. */
 		inline size_t read(void* buf, size_t len) {
 			std::lock_guard<decltype(spinlock)> guard(spinlock);

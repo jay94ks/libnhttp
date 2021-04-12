@@ -5,6 +5,7 @@
 #include "../../io/stream.hpp"
 #include "../http_raw_context.hpp"
 #include "../http_raw_listener.hpp"
+#include "../http_websock_message.hpp"
 
 namespace nhttp {
 namespace server {
@@ -103,6 +104,26 @@ namespace server {
 						current_feed->disconnect();
 					}
 
+					/* if 101 Switching Protocol and websocket, */
+					if (current->response.status.get_code() == 101) {
+						if (const auto* upgrade = current->response.headers.get(http_header::UPGRADE)) {
+							if (!strnicmp(upgrade, "websocket")) {
+								/* no reset state, just switch control-state to NSESS_WAITING_CONTEXT. */
+								contexts.cont_type = CONT_WEBSOCKET;
+								contexts.cont_phase = CONP_HEADER;
+
+								/* reset content reading states. */
+								contexts.cont_skip = 0;
+								contexts.cont_mark = contexts.cont_read = contexts.cont_left = 0;
+								contexts.keep_alive = 0;
+
+								state = NSESS_WAITING_CONTEXT;
+								ret = EVENT_RETRY;
+								break;
+							}
+						}
+					}
+
 					if (current) {
 						current->unconfigure();
 					}
@@ -115,13 +136,12 @@ namespace server {
 					if (line_buf.size() > params.buffer_size_in_kb * 512)
 						line_buf.resize(params.buffer_size_in_kb * 512);
 
-					if (receives.has_error) {
+					if (receives.has_error || !contexts.keep_alive) {
 						ret = EVENT_FAILURE;
 						break;
 					}
 					
 					reset_states();
-
 					ret = EVENT_SUCCESS;
 					break;
 			}
@@ -323,6 +343,9 @@ namespace server {
 						}
 					}
 
+					if (!current->hostname.size())
+						current->hostname = current->local_addr;
+
 					/**
 					 * "Messages MUST NOT include both a Content-Length header field and a non-identity transfer-coding.
 					 * If the message does include a non-identity transfer-coding, the Content-Length MUST be ignored."
@@ -391,7 +414,7 @@ namespace server {
 				if (!future_holder.is_completed())
 					return EVENT_AGAIN;
 
-				return EVENT_SUCCESS; 
+				return EVENT_SUCCESS;
 			}
 
 			contexts.cont_skip = 1;
@@ -421,11 +444,11 @@ namespace server {
 				size_t size = buffer->get_size();
 
 				/**
-				 * if buffered length is longer than 2 * chunk, 
+				 * if buffered length is longer than 2 * chunk,
 				 * wait until buffered bytes being read.
 				 */
 				if (size >= (chunk << 1))
-				   return EVENT_AGAIN;
+					return EVENT_AGAIN;
 
 				/* try preallocate more chunks. */
 				if (!buffer->preallocate() && !avail)
@@ -467,8 +490,8 @@ namespace server {
 
 				/* skip bytes instead of pushing live_buf into buffer. */
 				if (contexts.cont_skip && contexts.cont_left) {
-					size_t wastes = read > contexts.cont_left ? 
-									contexts.cont_left : read;
+					size_t wastes = size_t(read) > contexts.cont_left ?
+									size_t(contexts.cont_left) : read;
 
 					contexts.cont_read += wastes;
 					if (!(contexts.cont_left -= wastes))
@@ -525,6 +548,152 @@ namespace server {
 				}
 			}
 
+			//else if (contexts.cont_type == CONT_WEBSOCKET) {
+			//	/* send buffers before receiving data frames. */
+
+
+			//	/* for websockets, no skip needed. just disconnect it. */
+			//	if (contexts.cont_skip) {
+			//		contexts.cont_type = CONT_NONE;
+			//		contexts.keep_alive = 0;
+			//		return EVENT_RETRY;
+			//	}
+
+			//	size_t buffered_bytes = buffer->get_size();
+			//	size_t received_bytes = 0;
+
+			//	/* set marker for detecting incoming bytes. */
+			//	if (buffered_bytes < size_t(contexts.cont_mark)) {
+			//		contexts.cont_mark = buffered_bytes;
+			//		return EVENT_RETRY;
+			//	}
+
+			//	if ((received_bytes = buffered_bytes - contexts.cont_mark) > 0) {
+			//		if (contexts.cont_left <= 0) {
+
+			//			/* at least, 2 bytes required. */
+			//			if (received_bytes < 2)
+			//				return EVENT_AGAIN;
+
+			//			uint8_t header[14];
+
+			//			/* peek header bytes. */
+			//			size_t peeks = buffer->peek(header, 14);
+
+			//			/**
+			//				 0               1               2               3
+			//				 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+			//				+-+-+-+-+-------+-+-------------+-------------------------------+
+			//				|F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+			//				|I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+			//				|N|V|V|V|       |S|             |   (if payload len==126/127)   |
+			//				| |1|2|3|       |K|             |                               |
+			//				+-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
+			//				 4               5               6               7
+			//				+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+			//				|     Extended payload length continued, if payload len == 127  |
+			//				+ - - - - - - - - - - - - - - - +-------------------------------+
+			//				 8               9               10              11
+			//				+ - - - - - - - - - - - - - - - +-------------------------------+
+			//				|                               |Masking-key, if MASK set to 1  |
+			//				+-------------------------------+-------------------------------+
+			//			*/
+
+			//			/* before parsing header bytes, waiting its payload fields. */
+			//			int8_t plen_type = 
+			//				 (header[1] & 0x7f) == 0x7f ? 8 :		// --> requires 8 bytes more.
+			//				((header[1] & 0x7f) == 0x7e ? 2 : 0);	// --> requires 2 bytes more.
+
+			//			uint32_t mask_key = 0;
+
+			//			contexts.cont_mask = (header[1] >> 7) == 1 ? 1 : 0; /* `mask` bit. */
+			//			contexts.cont_opcd = header[0] & 0x0f;				/* `opcode` bit */
+
+			//			/* non-masked frame is disallowed. */
+			//			if (!contexts.cont_mask || 
+			//			     contexts.cont_opcd == 0x08) // 0x08: --> connection close.
+			//				 return EVENT_FAILURE;
+
+			//			if (contexts.cont_opcd > 2) {
+			//				/* control frames. */
+			//				char live_buf[1024];
+
+			//				// received_bytes
+			//				//0x09: PING
+			//				//0x0A: PONG
+			//			}
+
+			//			else {
+			//				/* message frames. */
+
+			//			}
+
+			//			/* if not end of feed and reading yet, */
+			//			if (current_feed) {
+			//				/* wait its end. */
+			//				if (!current_feed->is_end_of())
+			//					return EVENT_AGAIN;
+
+			//				/* disconnect current feed. */
+			//				current_feed->disconnect();
+			//			}
+
+			//			if (peeks <  size_t(2) + plen_type + 4)  return EVENT_AGAIN;
+			//			buffer->skip(size_t(2) + plen_type + 4); // --> skip header bytes.
+
+			//			/* then update length markup. */
+			//			contexts.cont_mark -= size_t(2) + plen_type + 4;
+			//			received_bytes -= size_t(2) + plen_type + 4;
+
+			//			contexts.cont_push = (header[0] >> 7) == 1 ? 1 : 0; /* `fin`    bit. */
+			//			contexts.cont_left = !plen_type ? header[1] & 0x7f : (plen_type == 4 ?
+			//				uint64_t((uint64_t(header[2]) << 56) | (uint64_t(header[3]) << 48) | (uint64_t(header[4]) << 40) | (uint64_t(header[5]) << 32) |
+			//					     (uint64_t(header[6]) << 24) | (uint64_t(header[7]) << 16) | (uint64_t(header[8]) << 8 ) | (uint64_t(header[9]) << 0 )) :
+			//				uint64_t((uint64_t(header[2]) << 8 ) | (uint64_t(header[3]) << 0 ))
+			//			);
+
+			//			contexts.cont_read = 0;
+			//			if (contexts.cont_mask) {
+			//				mask_key = (uint32_t(header[10]) << 24) | (uint32_t(header[11]) << 16) | (uint32_t(header[12]) << 8) | (uint32_t(header[13]) << 0);
+			//				current_feed = std::make_shared<http_websock_message>(buffer, contexts.cont_left, mask_key);
+			//			}
+
+			//			else current_feed = std::make_shared<http_websock_message>(buffer, contexts.cont_left);
+
+			//			/* notify message begins. */
+			//			future_holder = asyncs->future_of([this]() {
+			//				current->request.target.set_method(http_method::WS_NOTIFY);
+			//				current->request.content = current_feed;
+
+			//				listener->on_raw_context(current, receives.has_error);
+			//			});
+			//		}
+
+			//		if (!current_feed || current_feed->is_disconnected()) {
+			//			/* skip bytes. */
+			//			contexts.cont_left -= buffer->skip(contexts.cont_left);
+			//			return EVENT_AGAIN;
+			//		}
+
+			//		if (received_bytes) {
+			//			bool is_last_notify = received_bytes >= size_t(contexts.cont_left);
+			//			size_t cont_bytes = is_last_notify ? size_t(contexts.cont_left) : received_bytes;
+
+			//			contexts.cont_left -= cont_bytes;
+			//			contexts.cont_read += cont_bytes;
+			//			received_bytes -= cont_bytes;
+
+			//			if (cont_bytes) {
+			//				current_feed->notify(cont_bytes, contexts.cont_push);
+			//			}
+
+			//			/* marks cont_bytes as read. */
+			//			contexts.cont_mark += cont_bytes;
+			//		}
+			//	}
+
+			//}
+
 			else {
 				size_t buffered_bytes;
 
@@ -536,7 +705,7 @@ namespace server {
 				 *  0\r\n
 				 *  \r\n
 				 */
-				while((buffered_bytes = buffer->get_size()) > 0) {
+				while ((buffered_bytes = buffer->get_size()) > 0) {
 					size_t received_bytes = 0;
 
 					/* set marker for detecting incoming bytes. */
@@ -716,7 +885,7 @@ namespace server {
 		if (!future_holder.is_completed())
 			return EVENT_AGAIN;
 
-		else if (!sends.buffer_len) {
+		if (!sends.buffer_len) {
 			/* test content has reached on end of stream or not.*/
 			if (!content || content->is_end_of()) {
 				if (!sends.out_type || !sends.out_state) {
@@ -729,7 +898,7 @@ namespace server {
 
 				/* if chunk terminator required, */
 				sends.out_state = 0;
-				
+
 				/* write "0\r\n\r\n" to buffer. */
 				if (line_buf.size() < 5)
 					line_buf.resize(5);
@@ -772,7 +941,7 @@ namespace server {
 					}
 
 					sends.buffer_len = read;
-				});
+					});
 
 				return EVENT_AGAIN;
 			}

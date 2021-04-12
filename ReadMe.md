@@ -55,12 +55,14 @@ SOFTWARE.
 ## Dependency Licenses
 1. utfcpp: http://utfcpp.sourceforge.net/ (Boost Software License)
 2. wepoll: https://github.com/piscisaureus/wepoll (Copyright: Custom)
+3. sha1: https://github.com/983/SHA1 (Unlicense)
 
 both licenses are MIT compatible, but follows each library's license.
 
 **PLEASE READ THEIR LICENSE FILES**
 1. utfcpp: https://github.com/jay94ks/libnhttp/blob/main/libnhttp/nhttp/depends/utf8.h
 2. wepoll: https://github.com/jay94ks/libnhttp/tree/main/libnhttp/nhttp/depends/wepoll
+3. sha1: https://github.com/jay94ks/libnhttp/tree/main/libnhttp/nhttp/depends/sha1/LICENSE
 
 ## Quickstart example
 ```

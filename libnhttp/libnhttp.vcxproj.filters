@@ -91,6 +91,15 @@
     <ClCompile Include="nhttp\server\xfwk\xfwk_route.cpp">
       <Filter>nhttp\server\xfwk</Filter>
     </ClCompile>
+    <ClCompile Include="nhttp\server\xfwk\xfwk_websocket_target.cpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\extensions\http_websock_ep.cpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\internals\http_raw_request_content.cpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Makefile" />
@@ -140,6 +149,9 @@
     </Filter>
     <Filter Include="nhttp\server\xfwk">
       <UniqueIdentifier>{bd18a71a-c12f-4b30-99ee-93201e640ee5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\depends\sha1">
+      <UniqueIdentifier>{4a61f662-d6b2-4e99-8958-146e4f93a92c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -341,6 +353,21 @@
     <ClInclude Include="nhttp\server\xfwk\xfwk_route.hpp">
       <Filter>nhttp\server\xfwk</Filter>
     </ClInclude>
+    <ClInclude Include="nhttp\depends\sha1\sha1.hpp">
+      <Filter>nhttp\depends\sha1</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\xfwk\xfwk_websocket_target.hpp">
+      <Filter>nhttp\server\xfwk</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\extensions\http_websock_ep.hpp">
+      <Filter>nhttp\server\extensions</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\http_websock_message.hpp">
+      <Filter>nhttp\server</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\http_raw_content_handler.hpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="nhttp\depends\wepoll\LICENSE">
@@ -348,6 +375,15 @@
     </None>
     <None Include="nhttp\depends\wepoll\README.md">
       <Filter>nhttp\depends\wepoll</Filter>
+    </None>
+    <None Include="nhttp\depends\sha1\README.org">
+      <Filter>nhttp\depends\sha1</Filter>
+    </None>
+    <None Include="nhttp\depends\sha1\README.md">
+      <Filter>nhttp\depends\sha1</Filter>
+    </None>
+    <None Include="nhttp\depends\sha1\LICENSE">
+      <Filter>nhttp\depends\sha1</Filter>
     </None>
   </ItemGroup>
 </Project>

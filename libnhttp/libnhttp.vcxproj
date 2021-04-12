@@ -178,13 +178,16 @@
     <ClCompile Include="nhttp\server\extensions\http_vfile.cpp" />
     <ClCompile Include="nhttp\server\extensions\http_vpath.cpp" />
     <ClCompile Include="nhttp\server\extensions\http_vhost.cpp" />
+    <ClCompile Include="nhttp\server\extensions\http_websock_ep.cpp" />
     <ClCompile Include="nhttp\server\http_listener.cpp" />
     <ClCompile Include="nhttp\server\http_raw_listener.cpp" />
     <ClCompile Include="nhttp\server\internals\http_raw_link.cpp" />
+    <ClCompile Include="nhttp\server\internals\http_raw_request_content.cpp" />
     <ClCompile Include="nhttp\server\xfwk\xfwk_facade.cpp" />
     <ClCompile Include="nhttp\server\xfwk\xfwk_middleware.cpp" />
     <ClCompile Include="nhttp\server\xfwk\xfwk_route.cpp" />
     <ClCompile Include="nhttp\server\xfwk\xfwk_router.cpp" />
+    <ClCompile Include="nhttp\server\xfwk\xfwk_websocket_target.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Makefile" />
@@ -195,6 +198,7 @@
     <ClInclude Include="nhttp\asyncs\future.hpp" />
     <ClInclude Include="nhttp\asyncs\future_task.hpp" />
     <ClInclude Include="nhttp\asyncs\task.hpp" />
+    <ClInclude Include="nhttp\depends\sha1\sha1.hpp" />
     <ClInclude Include="nhttp\depends\utf8.h" />
     <ClInclude Include="nhttp\depends\wepoll\wepoll.h" />
     <ClInclude Include="nhttp\hal\barrior_t.hpp" />
@@ -228,6 +232,7 @@
     <ClInclude Include="nhttp\server\extensions\http_vfile.hpp" />
     <ClInclude Include="nhttp\server\extensions\http_vpath.hpp" />
     <ClInclude Include="nhttp\server\extensions\http_vhost.hpp" />
+    <ClInclude Include="nhttp\server\extensions\http_websock_ep.hpp" />
     <ClInclude Include="nhttp\server\http_context.hpp" />
     <ClInclude Include="nhttp\server\http_listener.hpp" />
     <ClInclude Include="nhttp\server\http_params.hpp" />
@@ -236,10 +241,12 @@
     <ClInclude Include="nhttp\server\http_link.hpp" />
     <ClInclude Include="nhttp\server\http_server.hpp" />
     <ClInclude Include="nhttp\server\http_taggable.hpp" />
+    <ClInclude Include="nhttp\server\http_websock_message.hpp" />
     <ClInclude Include="nhttp\server\internals\http_chunked_alloc.hpp" />
     <ClInclude Include="nhttp\server\internals\http_chunked_buffer.hpp" />
     <ClInclude Include="nhttp\server\internals\http_raw_request_content.hpp" />
     <ClInclude Include="nhttp\server\internals\http_raw_link.hpp" />
+    <ClInclude Include="nhttp\server\internals\http_raw_content_handler.hpp" />
     <ClInclude Include="nhttp\server\xfwk\xfwk.hpp" />
     <ClInclude Include="nhttp\server\xfwk\xfwk_facade.hpp" />
     <ClInclude Include="nhttp\server\xfwk\xfwk_middleware.hpp" />
@@ -247,6 +254,7 @@
     <ClInclude Include="nhttp\server\xfwk\xfwk_route.hpp" />
     <ClInclude Include="nhttp\server\xfwk\xfwk_router.hpp" />
     <ClInclude Include="nhttp\server\xfwk\xfwk_target.hpp" />
+    <ClInclude Include="nhttp\server\xfwk\xfwk_websocket_target.hpp" />
     <ClInclude Include="nhttp\types.hpp" />
     <ClInclude Include="nhttp\protocol\http_resource.hpp" />
     <ClInclude Include="nhttp\utils\defaultify.hpp" />
@@ -258,6 +266,9 @@
     <ClInclude Include="nhttp\utils\urlencode.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="nhttp\depends\sha1\LICENSE" />
+    <None Include="nhttp\depends\sha1\README.md" />
+    <None Include="nhttp\depends\sha1\README.org" />
     <None Include="nhttp\depends\wepoll\LICENSE" />
     <None Include="nhttp\depends\wepoll\README.md" />
   </ItemGroup>

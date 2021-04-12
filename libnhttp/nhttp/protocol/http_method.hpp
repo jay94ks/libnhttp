@@ -54,6 +54,10 @@ namespace nhttp {
 		static constexpr well_known_t ALL[] = { GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH };
 		static constexpr size_t		  ALL_COUNT = sizeof(ALL) / sizeof(well_known_t);
 
+		/* Pseudo methods for WebSocket. */
+		static constexpr well_known_t WS_NOTIFY = { 0xf0, "", 0 };
+		static constexpr well_known_t WS_CLOSED  = { 0xf1, "", 0 };
+
 	public:
 		http_method(invalid_t) : well_id(-1), flags(0) { }
 		http_method(well_known_t w) : name(w._2), well_id(w._1), flags(w._3) { }

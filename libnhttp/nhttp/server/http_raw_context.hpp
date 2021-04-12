@@ -14,6 +14,11 @@ namespace server {
 	class http_link;
 	class http_raw_link;
 
+	enum nhttp_protocol {
+		NPROTO_HTTP = 0,
+		NPROTO_WEBSOCKET
+	};
+
 	/**
 	 * class http_raw_request.
 	 * wraps request headers and its body.
@@ -48,6 +53,7 @@ namespace server {
 		friend class http_raw_link;
 
 	public:
+		int32_t						protocol;
 		int32_t						port			= 0;
 		std::string					hostname;
 		std::string					local_addr;
@@ -57,7 +63,7 @@ namespace server {
 		bool						is_closed;
 		bool						is_quiet;
 		std::shared_ptr<http_link>	link;
-
+		
 	private:
 		hal::spinlock_safe_t		spinlock;
 		http_raw_link*				raw_link;

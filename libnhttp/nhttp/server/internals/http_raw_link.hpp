@@ -28,6 +28,16 @@ namespace server {
 	};
 
 	/**
+	 * event control of http_raw_link.
+	 */
+	enum nhttp_event_control {
+		EVENT_FAILURE = 0,
+		EVENT_AGAIN,
+		EVENT_RETRY,
+		EVENT_SUCCESS
+	};
+
+	/**
 	 * class http_raw_link.
 	 * http link which handles connection itself.
 	 */
@@ -51,7 +61,8 @@ namespace server {
 		enum {
 			CONT_NONE = 0,
 			CONT_FIXED,
-			CONT_CHUNKED
+			CONT_CHUNKED,
+			CONT_WEBSOCKET
 		};
 
 		enum {
@@ -70,14 +81,20 @@ namespace server {
 		} receives;
 
 		struct {
+			int8_t keep_alive  : 1;
+
 			int8_t has_raised  : 1;
 			int8_t cont_skip   : 1;
-			int8_t cont_type   : 2; /* 0: none, 1: fixed_len, 2: chunked. */
-			int8_t cont_phase  : 2; /* 0: chunk-header, 1: chunk-body, 2: chunk-body-end */
+			int8_t cont_type   : 3; /* 0: none, 1: fixed_len, 2: chunked, 3: websocket. */
+			int8_t cont_phase  : 2; /* 0: header, 1: body, 2: body-end */
 
-			int64_t cont_left;
-			int64_t cont_read;
-			int64_t cont_mark;
+			int8_t cont_mask   : 1;
+			int8_t cont_opcd   : 4;
+			int8_t cont_push   : 1;
+
+			uint64_t cont_left;
+			uint64_t cont_read;
+			uint64_t cont_mark;
 		} contexts;
 
 		struct {
@@ -108,13 +125,6 @@ namespace server {
 		virtual bool on_event() override;
 
 	private:
-		enum {
-			EVENT_FAILURE = 0,
-			EVENT_AGAIN,
-			EVENT_RETRY,
-			EVENT_SUCCESS
-		};
-
 		/* reset state structures. */
 		inline void reset_states() {
 			memset(&receives, 0, sizeof(receives));
@@ -124,12 +134,14 @@ namespace server {
 			/* find LF if buffer isn't empty. */
 			receives.found_lf = buffer->find('\n');
 			receives.read_more = receives.found_lf < 0;
+			contexts.keep_alive = 1;
 		}
 
 	private:
 		int32_t on_receive();
 		int32_t on_handle();
 		int32_t on_send();
+
 	};
 
 }

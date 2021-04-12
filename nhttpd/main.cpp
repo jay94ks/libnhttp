@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
 	auto my_ctrl = std::make_shared<my_controller>();
 
 	router /* */
-		->get(target_by(my_ctrl, &my_controller::hello))
+		//->get(target_by(my_ctrl, &my_controller::hello))
 		->get("whoami", target_by([](http_request_ptr) {
 			return make_response("I'm jay!");
 		}))

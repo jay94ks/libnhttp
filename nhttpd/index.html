@@ -1,0 +1,16 @@
+<script>
+	var ws = new WebSocket("ws://127.0.0.1:8080/test");
+	ws.onopen = function(e) {
+		console.log("connected");
+	};
+	ws.onmessage = function(e) {
+		console.log(`server says: ${e.data}`);
+	};
+	ws.onclose = function(e) {
+		console.log("connection dead.");
+	};
+	ws.onerror = function(e) {
+		console.log(`error: ${e.message}`);
+	};
+	ws.send("hello");
+</script>

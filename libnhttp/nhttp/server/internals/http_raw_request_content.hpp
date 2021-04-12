@@ -5,6 +5,7 @@
 namespace nhttp {
 namespace server {
 	class http_raw_link;
+	class http_chunked_buffer;
 
 	/**
 	 * class http_raw_request_content.
@@ -13,8 +14,10 @@ namespace server {
 	class NHTTP_API http_raw_request_content : public stream {
 		friend class http_raw_link;
 
-	private:
+	protected:
 		mutable hal::spinlock_t spinlock;
+
+	private:
 		mutable hal::event_lite_t waiter;
 		
 		ssize_t total_bytes;
@@ -24,30 +27,23 @@ namespace server {
 		std::shared_ptr<http_chunked_buffer> buffer;
 		
 	public:
-		http_raw_request_content(std::shared_ptr<http_chunked_buffer> buffer, ssize_t total_bytes)
-			: waiter(false, true), buffer(buffer), total_bytes(total_bytes), read_requested(false), 
-			  avail_bytes(0), is_end(false), non_block(false)
-		{
+		http_raw_request_content(std::shared_ptr<http_chunked_buffer> buffer, ssize_t total_bytes);
+
+	protected:
+		inline bool is_disconnected() const { 
+			std::lock_guard<decltype(spinlock)> guard(spinlock); 
+			return !buffer;
 		}
 
 	public:
 		/* determines validity of this stream. */
-		virtual bool is_valid() const override {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			return buffer != nullptr;
-		}
+		virtual bool is_valid() const override;
 
 		/* determines currently at end of stream. */
-		virtual bool is_end_of() const override {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			return buffer == nullptr || (avail_bytes <= 0 && is_end) || !total_bytes;
-		}
+		virtual bool is_end_of() const override;
 
 		/* determines this stream is based on non-blocking or not. */
-		virtual bool is_nonblock() const override {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			return buffer == nullptr || non_block;
-		}
+		virtual bool is_nonblock() const override;
 
 		/**
 		 * set non-blocking.
@@ -55,54 +51,19 @@ namespace server {
 		 *	= true : supported and set.
 		 *  = false: not supported.
 		 */
-		virtual bool set_nonblock(bool value) override {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			non_block = value;
-			return true;
-		}
+		virtual bool set_nonblock(bool value) override;
 
 		/* determines this stream can be read immediately or not. */
-		virtual bool can_read() const override {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			return buffer == nullptr || avail_bytes > 0;
-		}
+		virtual bool can_read() const override;
 
 	protected:
-		inline bool wanna_read(size_t spins = 5) const {
-			while(spins--) {
-				if (!spinlock.try_lock())
-					return false;
-
-				if (buffer != nullptr && read_requested) {
-					spinlock.unlock();
-					return true;
-				}
-
-				spinlock.unlock();
-			}
-
-			return false;
-		}
+		bool wanna_read(size_t spins = 5) const;
 
 		/* notify given bytes ready to provide. */
-		inline void notify(size_t bytes, bool is_end) {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-
-			avail_bytes += bytes;
-			this->is_end = is_end;
-
-			waiter.signal();
-		}
+		void notify(size_t bytes, bool is_end);
 
 		/* link will call this before terminating the request. */
-		inline void disconnect() {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-
-			buffer = nullptr;
-			read_requested = false;
-			avail_bytes = 0;
-			waiter.signal();
-		}
+		void disconnect();
 
 	public:
 		/**
@@ -112,20 +73,7 @@ namespace server {
 		 *	>= 0: length.
 		 *  <  0: not supported.
 		 */
-		virtual ssize_t get_length() const override {
-			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			if (buffer != nullptr)  {
-				set_errno_c(0);
-
-				if (total_bytes < 0)
-					set_errno_c(ENOTSUP);
-
-				return total_bytes;
-			}
-
-			set_errno_c(ENOENT);
-			return 0;
-		}
+		virtual ssize_t get_length() const override;
 
 		/**
 		 * get current position of file cursor.
@@ -157,49 +105,7 @@ namespace server {
 		 * @note:
 		 *	errno == EWOULDBLOCK: for non-block mode.
 		 */
-		virtual int32_t read(void* buf, size_t len) override {
-			size_t read_bytes;
-
-			spinlock.lock();
-			set_errno(0);
-
-			while (buffer != nullptr) {
-				if ((read_bytes = len > avail_bytes ? avail_bytes : len) > 0) {
-					size_t ret = buffer->read(buf, read_bytes);
-
-					/* keep flag if length is less than read. */
-					read_requested = ret < len;
-					avail_bytes -= ret;
-
-					if (avail_bytes > 0)
-						 waiter.signal();
-
-					else waiter.unsignal();
-
-					spinlock.unlock();
-					std::this_thread::yield();
-					return int32_t(ret);
-				}
-
-				read_requested = true;
-
-				if (non_block) {
-					set_errno(EWOULDBLOCK);
-					spinlock.unlock();
-					return -1;
-				}
-					
-				spinlock.unlock();
-				std::this_thread::yield();
-
-				waiter.wait();
-				spinlock.lock();
-			}
-
-			set_errno(ENOENT);
-			spinlock.unlock();
-			return 0;
-		}
+		virtual int32_t read(void* buf, size_t len) override;
 
 		/**
 		 * wrtie bytes into stream.
@@ -220,6 +126,18 @@ namespace server {
 			disconnect();
 			std::this_thread::yield();
 		}
+
+	protected:
+		/**
+		 * read bytes from stream with already locked.
+		 * @returns:
+		 *	> 0: read size.
+		 *  = 0: end of stream.
+		 *  < 0: not supported or not available if non-block.
+		 * @note:
+		 *	errno == EWOULDBLOCK: for non-block mode.
+		 */
+		virtual int32_t read_locked(void* buf, size_t len);
 	};
 
 }

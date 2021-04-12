@@ -76,6 +76,10 @@ namespace _ {
 		static constexpr well_known_t X_FORWARDED_PROTO		= well_known_t( "X-Forwarded-Proto" );
 		static constexpr well_known_t IF_UNMODIFIED_SINCE	= well_known_t( "If-Unmodified-Since" );
 
+		/* Web-Socket handshaking headers */
+		static constexpr well_known_t SEC_WEBSOCKET_KEY		= well_known_t("Sec-WebSocket-Key");
+		static constexpr well_known_t SEC_WEBSOCKET_ACCEPT	= well_known_t("Sec-WebSocket-Accept");
+
 	private:
 		std::string name;
 		std::string value;
@@ -129,11 +133,11 @@ namespace _ {
 	private:
 		/* trim whitespaces. */
 		inline void qualify() {
-			name.erase(name.begin(), std::find_if(name.begin(), name.end(), [](unsigned char ch) { return !std::isspace(ch); }));
 			name.erase(std::find_if(name.rbegin(), name.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), name.end());
-
-			value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+			name.erase(name.begin(), std::find_if(name.begin(), name.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+			
 			value.erase(std::find_if(value.rbegin(), value.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), value.end());
+			value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](unsigned char ch) { return !std::isspace(ch); }));
 		}
 
 	public:

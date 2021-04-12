@@ -9,7 +9,7 @@
 namespace nhttp {
 namespace server {
 
-class http_link;
+	class http_link;
 	class http_request;
 	class http_response;
 	class http_context;
@@ -48,6 +48,9 @@ class http_link;
 		http_form_data forms;
 
 	public:
+		/* get raw link object. */
+		inline std::shared_ptr<http_link> get_link() const { return raw->link; }
+
 		/* get request timestamp. (read only) */
 		inline time_t get_timestamp() const { return raw->request.timestamp; }
 
