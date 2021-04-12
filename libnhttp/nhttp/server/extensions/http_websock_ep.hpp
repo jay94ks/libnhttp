@@ -18,9 +18,9 @@ namespace server {
 		virtual bool on_handle(std::shared_ptr<http_context> context) override;
 
 	protected:
-		virtual bool on_connect(std::shared_ptr<http_context> context);
-		virtual void on_message(std::shared_ptr<http_context> context);
-		virtual void on_disconnect(std::shared_ptr<http_context> context);
+		virtual bool on_connect(std::shared_ptr<http_context> context) { return false; }
+		virtual void on_message(std::shared_ptr<http_context> context) { }
+		virtual void on_disconnect(std::shared_ptr<http_context> context) { }
 	};
 }
 }

@@ -107,7 +107,7 @@ namespace server {
 					/* if 101 Switching Protocol and websocket, */
 					if (current->response.status.get_code() == 101) {
 						if (const auto* upgrade = current->response.headers.get(http_header::UPGRADE)) {
-							if (!strnicmp(upgrade, "websocket")) {
+							if (!strnicmp(upgrade, "websocket", 8)) {
 								/* no reset state, just switch control-state to NSESS_WAITING_CONTEXT. */
 								contexts.cont_type = CONT_WEBSOCKET;
 								contexts.cont_phase = CONP_HEADER;
