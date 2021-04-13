@@ -54,8 +54,9 @@ namespace server {
 				mutable http_listener* listener = nullptr;
 				mutable std::shared_ptr<http_context> context;
 				mutable utils::instrusive<std::thread, true> thread;
-				mutable std::atomic<int32_t> terminating = 0;
+				mutable std::atomic<int32_t> terminating;
 
+				state() : terminating(0) { }
 				~state() {
 					if (listener) {
 						--listener->waiters;

@@ -1,4 +1,5 @@
 #include "event_t.hpp"
+#include <iostream>
 
 #if NHTTP_OS_WINDOWS
 #include <Windows.h>
@@ -9,22 +10,21 @@ namespace hal {
 
 #if NHTTP_OS_POSIX
 	struct event_t::data_t {
-		utils::instrusive<pthread_mutex_t, true> mutex;
-		utils::instrusive<pthread_cond_t, true> cond;
+		pthread_mutex_t mutex;
+		pthread_cond_t cond;
 		bool condition, auto_reset;
 
 		inline pthread_mutex_t* as_mutex_ptr() {
-			return mutex ? &(*mutex) : nullptr;
+			return &mutex;
 		}
 
 		inline pthread_cond_t* as_cond_ptr() {
-			return cond ? &(*cond) : nullptr;
+			return &cond;
 		}
 
 		~data_t() {
-			if (cond) { pthread_cond_destroy(as_cond_ptr()); }
-			if (mutex) { pthread_mutex_destroy(as_mutex_ptr()); }
-			cond.unset(); mutex.unset();
+			pthread_cond_destroy(as_cond_ptr());
+			pthread_mutex_destroy(as_mutex_ptr());
 		}
 	};
 #endif
@@ -35,19 +35,24 @@ namespace hal {
 #endif
 #if NHTTP_OS_POSIX
 		int state;
+		pthread_mutexattr_t attr;
 
 		eve_p = std::shared_ptr<data_t>(new data_t());
 		eve_p->auto_reset = !manual_reset;
 		eve_p->condition = false;
 
-		eve_p->cond = pthread_cond_t();
-		eve_p->mutex = pthread_mutex_t();
+		pthread_mutexattr_init(&attr);
+		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 
-		do { state = pthread_mutex_init(eve_p->as_mutex_ptr(), nullptr); } while (state == -1 && (errno == ENOMEM || errno == EAGAIN));
+		do { state = pthread_mutex_init(eve_p->as_mutex_ptr(), &attr); }
+		while (state == -1 && (errno == ENOMEM || errno == EAGAIN));
 		NHTTP_CRITICAL(!state, "fatal error: failed to create mutex!");
 
-		do { state = pthread_cond_init(eve_p->as_cond_ptr(), nullptr); } while (state == -1 && (errno == ENOMEM || errno == EAGAIN));
+		do { state = pthread_cond_init(eve_p->as_cond_ptr(), nullptr); } 
+		while (state == -1 && (errno == ENOMEM || errno == EAGAIN));
 		NHTTP_CRITICAL(!state, "fatal error: failed to create cond-var!");
+
+		pthread_mutexattr_destroy(&attr);
 #endif
 	}
 
@@ -121,6 +126,7 @@ namespace hal {
 
 			if (eve_p->condition && eve_p->auto_reset) {
 				eve_p->condition = false;
+				state = 0;
 				break;
 			}
 

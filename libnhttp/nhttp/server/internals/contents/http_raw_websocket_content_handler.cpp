@@ -85,7 +85,6 @@ namespace server {
 					return EVENT_FAILURE;
 				}
 
-				/* */
 				if (frame_hdr.hdr.len == 0x7f) { 
 					state.frame_mode = 3;
 					frame_hdr_sz = 2 + 8 + 4; /* hdr + plen + mkey. */
@@ -118,6 +117,8 @@ namespace server {
 			if (frame_hdr_sz && sz >= frame_hdr_sz) {
 				if (frame_hdr.hdr.opc > 2) {
 					/* control frames. */
+
+					return EVENT_RETRY;
 				}
 
 				state.cont_phase = CONP_BODY;
@@ -140,13 +141,29 @@ namespace server {
 						state.mask_key = frame_hdr._n_8.mkey;
 						break;
 				}
-
-				return EVENT_RETRY;
 			}
-
-			return EVENT_AGAIN;
 		}
 
+		switch (state.frame_mode) {
+			case 1: return on_event_n1(socket);
+			case 2: return on_event_n2(socket);
+			case 3: return on_event_n8(socket);
+			default: break;
+		}
+
+		return EVENT_AGAIN;
+	}
+
+	int32_t http_raw_websocket_content_handler::on_event_n1(socket_t& socket) {
+		
+		return EVENT_AGAIN;
+	}
+
+	int32_t http_raw_websocket_content_handler::on_event_n2(socket_t& socket) {
+		return EVENT_AGAIN;
+	}
+
+	int32_t http_raw_websocket_content_handler::on_event_n8(socket_t& socket) {
 		return EVENT_AGAIN;
 	}
 

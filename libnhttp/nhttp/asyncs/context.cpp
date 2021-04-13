@@ -1,5 +1,6 @@
 #include "context.hpp"
 #include "task.hpp"
+#include <iostream>
 
 namespace nhttp {
 namespace asyncs {

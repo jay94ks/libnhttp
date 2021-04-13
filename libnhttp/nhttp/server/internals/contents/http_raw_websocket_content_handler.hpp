@@ -32,9 +32,7 @@ namespace server {
 	 *	+---------------------------------------------------------------+
 	 */
 
-#ifdef _MSC_VER
 #pragma pack(push, 1)
-#endif
 	union hws_frame_hdr {
 		uint8_t packed_bytes[2];
 		struct {
@@ -51,8 +49,8 @@ namespace server {
 			uint8_t msk : 1;
 			uint8_t len : 7;
 #endif
-		} __nhttp_packed__;
-	} __nhttp_packed__;
+		};
+	};
 
 	union hws_frame {
 		hws_frame_hdr	hdr;
@@ -60,16 +58,14 @@ namespace server {
 		struct { hws_frame_hdr hdr; uint32_t mkey;					} _n_1;
 		struct { hws_frame_hdr hdr; uint16_t plen; uint32_t mkey;	} _n_2;
 		struct { hws_frame_hdr hdr; uint64_t plen; uint32_t mkey;	} _n_8;
-	} __nhttp_packed__;
+	};
 
 	/* ping-pong max size buffer. */
 	union hws_ping_pong {
 		hws_frame		hdr;
 		uint8_t			packed_bytes[6 + 125];
-	} __nhttp_packed__;
-#ifdef _MSC_VER
+	};
 #pragma pack(pop)
-#endif
 
 	static_assert(sizeof(hws_frame_hdr) == 2 && sizeof(hws_frame) == 16,
 		"error: compiler can't generate frame header structure packed!" );
@@ -109,10 +105,6 @@ namespace server {
 
 		/* handle socket events for feeding content. */
 		virtual int32_t on_event(socket_t& socket) override;
-
-		inline void on_cont_set_n1() {
-
-		}
 
 		int32_t on_event_n1(socket_t& socket);
 		int32_t on_event_n2(socket_t& socket);

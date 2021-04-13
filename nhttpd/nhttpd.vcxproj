@@ -72,28 +72,28 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)libnhttp\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)Binaries\libnhttp\$(Configuration)\$(PlatformName)\;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
     <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)libnhttp\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)Binaries\libnhttp\$(Configuration)\$(PlatformName)\;C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
     <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)libnhttp\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)Binaries\libnhttp\$(Configuration)\$(PlatformName)\;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
     <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)libnhttp\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)Binaries\libnhttp\$(Configuration)\$(PlatformName)\;C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)Binaries\$(ProjectName)\$(Configuration)\$(PlatformName)\</OutDir>
     <IntDir>$(SolutionDir)Immediates\$(ProjectName)\$(Configuration)\$(PlatformName)\</IntDir>

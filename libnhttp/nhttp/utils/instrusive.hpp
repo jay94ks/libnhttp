@@ -79,6 +79,11 @@ namespace utils {
 			return *this;
 		}
 
+		inline type* as_ptr() {
+			NHTTP_INIT_ASSERT(ready, "tried to access uninitialized instrusive<type>!");
+			return ((type*)blobs);
+		}
+
 		inline type& operator *() {
 			NHTTP_INIT_ASSERT(ready, "tried to access uninitialized instrusive<type>!");
 			return *((type*)blobs); 

@@ -35,7 +35,7 @@ namespace server {
 		for (auto module : registry->extensions) {
 			if (!module->on_collect(context)) {
 				registry->rwlock.unlock_read();
-				return false;
+				continue;
 			}
 
 			order.push(module);

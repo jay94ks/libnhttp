@@ -54,10 +54,11 @@ namespace server {
 			for (auto module : registry->extensions) {
 				if (!module->on_collect(context)) {
 					registry->rwlock.unlock_read();
+					continue;
 
-					context->response->status.set(403);
+					/*context->response->status.set(403);
 					context->close();
-					return;
+					return;*/
 				}
 
 				order.push(module);

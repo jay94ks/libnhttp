@@ -1,11 +1,11 @@
 ﻿
-#include "../libnhttp/nhttp/types.hpp"
-#include "../libnhttp/nhttp/server/http_listener.hpp"
-#include "../libnhttp/nhttp/server/http_context.hpp"
-#include "../libnhttp/nhttp/server/extensions/http_vhost.hpp"
-#include "../libnhttp/nhttp/server/extensions/http_overlay.hpp"
+#include "nhttp/types.hpp"
+#include "nhttp/server/http_listener.hpp"
+#include "nhttp/server/http_context.hpp"
+#include "nhttp/server/extensions/http_vhost.hpp"
+#include "nhttp/server/extensions/http_overlay.hpp"
 
-#include "../libnhttp/nhttp/server/xfwk/xfwk.hpp"
+#include "nhttp/server/xfwk/xfwk.hpp"
 #include <iostream>
 
 #ifdef _MSC_VER

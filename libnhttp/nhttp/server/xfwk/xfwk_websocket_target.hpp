@@ -21,7 +21,7 @@ namespace xfwk {
 		virtual http_response_ptr handle(http_request_ptr request) const;
 
 	protected:
-		virtual void on_newbie();
+		virtual void on_newbie() { }
 	};
 }
 }

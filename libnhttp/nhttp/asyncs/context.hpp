@@ -19,7 +19,7 @@ namespace asyncs {
 		std::atomic<int32_t> dtor;
 		std::atomic<uint64_t> tasks;
 
-		std::queue<std::thread> workers;
+		std::queue<std::thread, std::list<std::thread>> workers;
 		std::queue<std::shared_ptr<task>> runnables;
 
 		std::queue<hal::event_t> pooled_events;

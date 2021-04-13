@@ -1,5 +1,5 @@
-X_SOURCES := $(shell find . -type f -regex ".*\.cpp")
-C_SOURCES := $(shell find . -type f -regex ".*\.c")
+X_SOURCES := $(shell find ./nhttp -type f -regex ".*\.cpp")
+C_SOURCES := $(shell find ./nhttp -type f -regex ".*\.c")
 
 X_STATIC_OBJECTS := $(patsubst %.cpp,%.cpp.ao, $(X_SOURCES))
 C_STATIC_OBJECTS := $(patsubst %.c,%.c.ao, $(C_SOURCES))
