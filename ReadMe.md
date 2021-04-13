@@ -9,6 +9,7 @@ Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will
 
 * [License](#license)
 * [Dependency Licenses](#dependency-licenses)
+* [Code Coverage](#code-coverage)
 * [Quickstart example](#quickstart-example)
 * [Pure Socket Server Library](#pure-socket-server-library)
 	* [Socket](#socket)
@@ -64,6 +65,9 @@ both licenses are MIT compatible, but follows each library's license.
 1. utfcpp: https://github.com/jay94ks/libnhttp/blob/main/libnhttp/nhttp/depends/utf8.h
 2. wepoll: https://github.com/jay94ks/libnhttp/tree/main/libnhttp/nhttp/depends/wepoll
 3. sha1: https://github.com/jay94ks/libnhttp/tree/main/libnhttp/nhttp/depends/sha1/LICENSE
+
+## Code Coverage
+1. Line coverage: https://raw.githack.com/jay94ks/libnhttp/main/coverage/index.html
 
 ## Quickstart example
 ```
