@@ -76,7 +76,7 @@ namespace nhttp {
 		out_string.append(ver, 4);
 
 		if (code < 100 || !phrase.size()) {
-			http_status temp(code < 100 ? 500 : code);
+			http_status temp(code = code < 100 ? 500 : code);
 
 			if (!temp.phrase.size())
 				temp.phrase = "Unknown";

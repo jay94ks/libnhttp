@@ -22,8 +22,6 @@ namespace asyncs {
 		std::queue<std::thread, std::list<std::thread>> workers;
 		std::queue<std::shared_ptr<task>> runnables;
 
-		std::queue<hal::event_t> pooled_events;
-
 	public:
 		context(int32_t worker_count);
 		~context();
@@ -43,21 +41,6 @@ namespace asyncs {
 			using return_type = decltype(lambda());
 			using handle_type = _::future_task<typename std::decay<return_type>::type, lambda_type>;
 			using future_type = future<typename std::decay<return_type>::type>;
-
-			utils::instrusive<hal::event_t, true> event;
-
-
-			barrior.lock();
-			if (!pooled_events.size()) 
-				event = hal::event_t(false, true);
-			
-			else {
-				event = pooled_events.front();
-				pooled_events.pop();
-			}
-
-			(*event).unsignal();
-			barrior.unlock();
 
 			auto runnable = std::make_shared<handle_type>(std::move(lambda));
 			auto future_is = future_type(runnable);

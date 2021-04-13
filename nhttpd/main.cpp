@@ -107,8 +107,17 @@ int main_real(int argc, char** argv) {
 			});
 		});
 
-	time_t tt = time(nullptr);
+	int32_t k = 0;
+	for (auto cont : listener) {
+		cont->response->status.set(404);
+		cont->close();
 
+		if (++k > 5) {
+			break;
+		}
+	}
+
+	time_t tt = time(nullptr);
 	/* Main thread as event thread. */
 	listener.run([&](auto) {
 		return time(nullptr) - tt < 60;

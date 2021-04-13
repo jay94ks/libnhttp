@@ -31,22 +31,16 @@ namespace nhttp {
 		while (max && (*col == ' ' || *col == '\t')) { ++col; --max; }
 
 		dst.set_name(std::string(src, size_t(src_e - src)));
-		if (lf) {
-			const char* lf_b = lf;
+		const char* lf_b = lf;
 
-			while (col < lf && (*lf == ' ' || *lf == '\t' || *lf == '\r' || *lf == '\n')) { --lf; }
-			++lf;
+		while (col < lf && (*lf == ' ' || *lf == '\t' || *lf == '\r' || *lf == '\n')) { --lf; }
+		++lf;
 
-			if (col < lf) {
-				dst.set_value(std::string(col, size_t(lf - col)));
-			}
-
-			return int32_t(lf_b - src_o + 1);
+		if (col < lf) {
+			dst.set_value(std::string(col, size_t(lf - col)));
 		}
 
-		size_t len = strnlen(col, max);
-		dst.set_value(std::string(col, len));
-		return int32_t(col - src_o + len);
+		return int32_t(lf_b - src_o + 1);
 	}
 
 	/**
