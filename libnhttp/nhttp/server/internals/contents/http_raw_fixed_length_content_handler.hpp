@@ -4,16 +4,19 @@
 namespace nhttp {
 namespace server {
 
+	/**
+	 * class http_raw_fixed_len_content_handler.
+	 * fixed-length content.
+	 */
 	class NHTTP_API http_raw_fixed_len_content_handler
 		: public http_raw_content_handler
 	{
 	public:
 		struct {
-			int8_t cont_skip : 1;
 			int8_t read_more : 1;
 			
-			uint64_t cont_left;
-			uint64_t cont_read;
+			int64_t cont_left;
+			int64_t cont_read;
 			int64_t cont_mark;
 		} state = { 0, };
 

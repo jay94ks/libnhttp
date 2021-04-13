@@ -9,6 +9,7 @@ namespace nhttp {
 namespace server {
 
 	void http_raw_chunked_content_handler::on_initiate() {
+		state.cont_mark = buffer->get_size();
 		state.found_lf = -1;
 	}
 
@@ -18,6 +19,9 @@ namespace server {
 	int32_t http_raw_chunked_content_handler::on_event(socket_t& socket) {
 		size_t avail = buffer->get_left_capacity();
 		size_t chunk = buffer->get_chunk_size();
+
+		if (!skip_all && !feed->wanna_read())
+			return EVENT_AGAIN;
 
 		if (!buffer->get_size())
 			state.read_more = 1;
@@ -71,27 +75,31 @@ namespace server {
 			/* skip bytes instead of pushing live_buf into buffer. */
 			if (skip_all && state.cont_left) {
 				size_t wastes = size_t(read) > state.cont_left ?
-					size_t(state.cont_left) : read;
+								size_t(state.cont_left) : read;
 
 				state.cont_read += wastes;
+				state.cont_mark -= wastes;
+
 				if (!(state.cont_left -= wastes))
 					state.read_more = 0;
 
 				/* if reading content section and in skipping mode, waste all content bytes. */
 				if (read - wastes > 0) {
-					buffer->write(live_buf + wastes, read - wastes);
-					avail -= read - wastes;
+					size_t len = buffer->write(live_buf + wastes, read - wastes);
+
+					avail -= len;
+					state.cont_mark += len;
 				}
 			}
 
 			else {
 				/* push live buf to buffer. */
-				buffer->write(live_buf, read);
-				avail -= read;
+				size_t len = buffer->write(live_buf, read);
+
+				avail -= len;
+				state.cont_mark += len;
 			}
 		}
-
-		size_t buffered_bytes;
 
 		/**
 		 * expects:
@@ -101,18 +109,7 @@ namespace server {
 		 *  0\r\n
 		 *  \r\n
 		 */
-		while ((buffered_bytes = buffer->get_size()) > 0) {
-			size_t received_bytes = 0;
-
-			/* set marker for detecting incoming bytes. */
-			if (int64_t(buffered_bytes) < state.cont_mark) {
-				state.cont_mark = buffered_bytes;
-				continue;
-			}
-
-			if ((received_bytes = buffered_bytes - state.cont_mark) <= 0)
-				break;
-
+		while (state.cont_mark > 0) {
 			if (state.cont_phase == CONP_HEADER) {
 				if (state.found_lf < 0) {
 					state.found_lf = buffer->find('\n');
@@ -128,25 +125,22 @@ namespace server {
 					line_buf.resize(state.found_lf + 1);
 
 				buffer->read(&line_buf[0], state.found_lf + 1);
-				received_bytes -= state.found_lf + 1;
+				state.cont_mark -= state.found_lf + 1;
 
 				/* handle chunk body. */
 				state.cont_phase = CONP_BODY;
 				state.cont_left = to_int64(&line_buf[0], 16, state.found_lf + 1);
 				state.cont_read = 0;
-
-				/* marks receives.found_lf + 1 as read. */
-				state.cont_mark -= state.found_lf + 1;
 			}
 
 			if (state.cont_phase == CONP_BODY) {
-				if (state.cont_left && received_bytes) {
-					bool is_last_notify = received_bytes >= size_t(state.cont_left);
-					size_t cont_bytes = is_last_notify ? state.cont_left : received_bytes;
+				if (state.cont_left && state.cont_mark) {
+					bool is_last_notify = state.cont_mark >= ssize_t(state.cont_left);
+					size_t cont_bytes = is_last_notify ? state.cont_left : state.cont_mark;
 
 					state.cont_left -= cont_bytes;
 					state.cont_read += cont_bytes;
-					received_bytes -= cont_bytes;
+					state.cont_mark -= cont_bytes;
 
 					if (cont_bytes) {
 						if (feed) {
@@ -155,20 +149,20 @@ namespace server {
 
 						else buffer->skip(cont_bytes);
 					}
-
-					/* marks cont_bytes as read. */
-					state.cont_mark += cont_bytes;
 				}
 
 				if (state.cont_left <= 0) {
 					state.cont_phase = CONP_BODY_END;
-					state.found_lf = buffer->find('\n');
+					state.found_lf = -1;
 				}
 
 				else break;
 			}
 
 			if (state.cont_phase == CONP_BODY_END) {
+				if ((skip_all && state.cont_left) || (feed && !feed->is_empty()))
+					break;
+
 				if (state.found_lf < 0) {
 					state.found_lf = buffer->find('\n');
 
@@ -182,9 +176,6 @@ namespace server {
 					line_buf.resize(state.found_lf + 1);
 
 				buffer->read(&line_buf[0], state.found_lf + 1);
-				received_bytes -= state.found_lf + 1;
-
-				/* marks receives.found_lf + 1 as read. */
 				state.cont_mark -= state.found_lf + 1;
 
 				if (state.cont_read <= 0) {

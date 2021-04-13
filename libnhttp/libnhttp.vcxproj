@@ -183,6 +183,7 @@
     <ClCompile Include="nhttp\server\http_raw_listener.cpp" />
     <ClCompile Include="nhttp\server\internals\contents\http_raw_chunked_content.cpp" />
     <ClCompile Include="nhttp\server\internals\contents\http_raw_fixed_length_content_handler.cpp" />
+    <ClCompile Include="nhttp\server\internals\contents\http_raw_websocket_content_handler.cpp" />
     <ClCompile Include="nhttp\server\internals\http_raw_link.cpp" />
     <ClCompile Include="nhttp\server\internals\http_raw_request_content.cpp" />
     <ClCompile Include="nhttp\server\xfwk\xfwk_facade.cpp" />
@@ -246,6 +247,7 @@
     <ClInclude Include="nhttp\server\http_websock_message.hpp" />
     <ClInclude Include="nhttp\server\internals\contents\http_raw_chunked_content_handler.hpp" />
     <ClInclude Include="nhttp\server\internals\contents\http_raw_fixed_length_content_handler.hpp" />
+    <ClInclude Include="nhttp\server\internals\contents\http_raw_websocket_content_handler.hpp" />
     <ClInclude Include="nhttp\server\internals\http_chunked_alloc.hpp" />
     <ClInclude Include="nhttp\server\internals\http_chunked_buffer.hpp" />
     <ClInclude Include="nhttp\server\internals\http_raw_request_content.hpp" />

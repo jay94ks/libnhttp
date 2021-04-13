@@ -3,9 +3,9 @@
 #include "../../assert.hpp"
 
 #if defined(_WIN32) || defined(_WIN64)
-#define NHTTP_OS_WINDOWS 1
+#define NHTTP_OS_WINDOWS	1
 #else
-#define NHTTP_OS_WINDOWS 0
+#define NHTTP_OS_WINDOWS	0
 #endif
 
 namespace nhttp {

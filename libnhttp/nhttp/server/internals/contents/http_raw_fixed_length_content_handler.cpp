@@ -18,6 +18,9 @@ namespace server {
 		size_t avail = buffer->get_left_capacity();
 		size_t chunk = buffer->get_chunk_size();
 
+		if (!feed->wanna_read())
+			return EVENT_AGAIN;
+
 		if (!buffer->get_size())
 			state.read_more = 1;
 
@@ -57,7 +60,7 @@ namespace server {
 
 			/* skip bytes instead of pushing live_buf into buffer. */
 			if (skip_all && state.cont_left) {
-				size_t wastes = size_t(read) > state.cont_left ?
+				size_t wastes = read > state.cont_left ?
 								size_t(state.cont_left) : read;
 
 				state.cont_read += wastes;
@@ -85,7 +88,7 @@ namespace server {
 		}
 
 		if (state.cont_left && state.cont_mark) {
-			bool is_last_notify = state.cont_mark >= size_t(state.cont_left);
+			bool is_last_notify = state.cont_mark >= state.cont_left;
 			size_t cont_bytes = is_last_notify ? size_t(state.cont_left) : state.cont_mark;
 
 			state.cont_left -= cont_bytes;

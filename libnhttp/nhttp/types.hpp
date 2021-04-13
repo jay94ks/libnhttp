@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
+#include <endian.h>
 #endif
 
 #include <cstdint>
@@ -25,6 +26,7 @@
 
 #ifdef _MSC_VER
 #	define inline __forceinline
+#	define __nhttp_packed__
 
 #if defined(__NHTTP_STATIC__)
 #	define NHTTP_API
@@ -38,6 +40,7 @@
 #else
 //#	define inline __attribute__((always_inline))
 #	define NHTTP_API
+#	define __nhttp_packed__  __attribute__((packed))
 #endif
 
 #if defined(_DEBUG)
@@ -50,11 +53,38 @@
 #	define NHTTP_RELEASE(...) __VA_ARGS__
 #endif
 
-
 namespace nhttp {
 	using nullptr_t = decltype(nullptr);
 
 #if defined(_WIN64) || defined(_WIN32)
 	using ssize_t = typename std::make_signed<size_t>::type;
 #endif
+
+	/* alternative of <bit> header. */
+	enum endianness {
+		NHTTP_ENDIAN_LITTLE	= 0,	/* Little endian. */
+		NHTTP_ENDIAN_BIG	= 1,	/* Big endian.    */
+
+#if defined(_WIN64) || defined(_WIN32)
+		NHTTP_ENDIAN_NATIVE	= NHTTP_ENDIAN_LITTLE
+#	define NHTTP_LITTLE_ENDIAN	1
+#else
+#	if __BYTE_ORDER == __LITTLE_ENDIAN
+		NHTTP_ENDIAN_NATIVE = NHTTP_ENDIAN_LITTLE
+#	define NHTTP_LITTLE_ENDIAN	1
+#	elif __BYTE_ORDER == __BIG_ENDIAN
+		NHTTP_ENDIAN_NATIVE = NHTTP_ENDIAN_BIG
+#	define NHTTP_BIG_ENDIAN		1
+#	else
+#	pragma error "Not supported endian."
+#	endif
+#endif
+
+#ifndef NHTTP_LITTLE_ENDIAN
+#	define NHTTP_LITTLE_ENDIAN	0
+#endif
+#ifndef NHTTP_BIG_ENDIAN
+#	define NHTTP_BIG_ENDIAN		0
+#endif
+	};
 }

@@ -12,8 +12,6 @@ namespace server {
 
 		struct {
 			int8_t read_more : 1;
-
-			int8_t cont_type : 3; /* 0: none, 1: fixed_len, 2: chunked. */
 			int8_t cont_phase : 3; /* 0: header, 1: body, 2: body-end */
 
 			ssize_t found_lf;

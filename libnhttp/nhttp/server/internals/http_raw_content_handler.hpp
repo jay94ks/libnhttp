@@ -18,7 +18,8 @@ namespace server {
 	enum {
 		CONP_HEADER = 0,
 		CONP_BODY,
-		CONP_BODY_END
+		CONP_BODY_END,
+		CONP_
 	};
 
 	/**

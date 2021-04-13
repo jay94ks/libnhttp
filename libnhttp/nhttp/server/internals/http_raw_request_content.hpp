@@ -8,6 +8,7 @@ namespace server {
 	class http_chunked_buffer;
 	class http_raw_chunked_content_handler;
 	class http_raw_fixed_len_content_handler;
+	class http_raw_websocket_content_handler;
 
 	/**
 	 * class http_raw_request_content.
@@ -17,6 +18,7 @@ namespace server {
 		friend class http_raw_link;
 		friend class http_raw_chunked_content_handler;
 		friend class http_raw_fixed_len_content_handler;
+		friend class http_raw_websocket_content_handler;
 
 	protected:
 		mutable hal::spinlock_t spinlock;
@@ -62,6 +64,22 @@ namespace server {
 
 	protected:
 		bool wanna_read(size_t spins = 5) const;
+
+		bool is_empty(size_t spins = 5) const {
+			while (spins--) {
+				if (!spinlock.try_lock())
+					return false;
+
+				if (buffer != nullptr && avail_bytes <= 0) {
+					spinlock.unlock();
+					return true;
+				}
+
+				spinlock.unlock();
+			}
+
+			return false;
+		}
 
 		/* notify given bytes ready to provide. */
 		void notify(size_t bytes, bool is_end);

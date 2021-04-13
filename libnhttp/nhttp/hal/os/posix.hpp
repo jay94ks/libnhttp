@@ -1,5 +1,6 @@
 #pragma once
 #include "../../types.hpp"
+
 #if (!defined(_WIN32) && !defined(_WIN64))
 #	define NHTTP_OS_POSIX 1
 #	include <pthread.h>

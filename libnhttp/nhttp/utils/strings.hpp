@@ -51,7 +51,7 @@ namespace nhttp {
 		int64_t n = 0;
 
 		while (*str && max--) {
-			int64_t c = *str++;
+			int32_t c = *str++;
 
 			if (!std::isalnum(c))
 				break;
