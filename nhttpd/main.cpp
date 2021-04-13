@@ -34,6 +34,10 @@ int main_real(int argc, char** argv) {
 	http_listener listener(watcher, http_params());
 
 	ipv4::resolve("google.com", 443);
+	ipv6::resolve("google.com", 443);
+
+	ipv4::resolve_all("google.com");
+	ipv6::resolve_all("google.com");
 
 	if (!listener.with(ipv4::resolve("0.0.0.0", 8080))) {
 		std::cout << "error: can't listen: 0.0.0.0:8080.\n";

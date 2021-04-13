@@ -54,6 +54,8 @@ run-test-app: test-app
 	curl -v "http://127.0.0.1:8080/whoami?dummy=query-string&a=1,b=c&d=3"; true
 	curl -v "http://127.0.0.1:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
 	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://127.0.0.1:8080/jay/set?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://127.0.0.1:8080/jay/greetings?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://127.0.0.1:8080/jay/profile?dummy=query-string&a=1,b=c&d=3"; true
 	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://127.0.0.1:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
 	curl -d "HELLO=WORLD~&whowhowho=11" -v -X PUT "http://127.0.0.1:8080/jay/set?dummy=query-string&a=1,b=c&d=3"; true
 	curl -d "HELLO=WORLD~&whowhowho=11" -v -X PUT "http://127.0.0.1:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
@@ -65,6 +67,28 @@ run-test-app: test-app
 	curl -d @index.html -v -H "Content-Type: application/octet-steam" -X PUT "http://127.0.0.1:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
 	dd if=/dev/zero of=test.bin bs=102400 count=1024; true
 	wget -O temp.bin "http://127.0.0.1:8080/test.bin"
+	rm -rf test.bin temp.bin
+	curl -v "http://[::1]:8080/?dummy=query-string&a=1,b=c&d=3"; true
+	curl -i "http://[::1]:8080/" -H "Range: bytes=0-5"; true
+	curl -i -v -H "Range: bytes=0-" "http://[::1]:8080/"; true
+	curl -i -v -H "Range: bytes=0-" -H 'If-None-Match: "NH-0000150560759eed"' "http://[::1]:8080/"; true
+	curl -i -v -H "Range: bytes=0-" -H 'If-Modified-Since: Tue, 13 Apr 2021 13:38:53 GMT' "http://[::1]:8080/"; true
+	curl -v "http://[::1]:8080/whoami?dummy=query-string&a=1,b=c&d=3"; true
+	curl -v "http://[::1]:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://[::1]:8080/jay/set?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://[::1]:8080/jay/greetings?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://[::1]:8080/jay/profile?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v "http://[::1]:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v -X PUT "http://[::1]:8080/jay/set?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v -X PUT "http://[::1]:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v -X PATCH "http://[::1]:8080/jay/set?this=should&be=405"; true
+	curl -v -X DELETE "http://[::1]:8080/jay?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -v -X DELETE "http://[::1]:8080/jay?this=should&be=400"; true
+	curl -d "HELLO=WORLD~&whowhowho=11" -H 'Transfer-Encoding: chunked' -v -X POST "http://[::1]:8080/jayset?this=can&be&handled=1"; true
+	curl -d @index.html -v -H "Content-Type: application/octet-steam" -X POST "http://[::1]:8080/jay/set?dummy=query-string&a=1,b=c&d=3"; true
+	curl -d @index.html -v -H "Content-Type: application/octet-steam" -X PUT "http://[::1]:8080/always-501?dummy=query-string&a=1,b=c&d=3"; true
+	dd if=/dev/zero of=test.bin bs=102400 count=1024; true
+	wget -O temp.bin "http://[::1]:8080/test.bin"
 	rm -rf test.bin temp.bin
 
 coverage.info:

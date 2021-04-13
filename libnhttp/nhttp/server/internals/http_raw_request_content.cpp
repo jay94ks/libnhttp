@@ -116,47 +116,8 @@ namespace server {
 	*/
 
 	int32_t http_raw_request_content::read(void* buf, size_t len) {
-		size_t read_bytes;
-
-		spinlock.lock();
-		set_errno(0);
-
-		while (buffer != nullptr) {
-			if ((read_bytes = len > avail_bytes ? avail_bytes : len) > 0) {
-				size_t ret = buffer->read(buf, read_bytes);
-
-				/* keep flag if length is less than read. */
-				read_requested = ret < len;
-				avail_bytes -= ret;
-
-				if (avail_bytes > 0)
-					waiter.signal();
-
-				else waiter.unsignal();
-
-				spinlock.unlock();
-				std::this_thread::yield();
-				return int32_t(ret);
-			}
-
-			read_requested = true;
-
-			if (non_block) {
-				set_errno(EWOULDBLOCK);
-				spinlock.unlock();
-				return -1;
-			}
-
-			spinlock.unlock();
-			std::this_thread::yield();
-
-			waiter.wait();
-			spinlock.lock();
-		}
-
-		set_errno(ENOENT);
-		spinlock.unlock();
-		return 0;
+		std::lock_guard<decltype(spinlock)> guard(spinlock);
+		return read_locked(buf, len);
 	}
 
 	int32_t http_raw_request_content::read_locked(void* buf, size_t len) {
@@ -191,7 +152,9 @@ namespace server {
 			spinlock.unlock();
 			std::this_thread::yield();
 
-			waiter.wait();
+			if (!waiter.try_wait())
+				 waiter.wait();
+
 			spinlock.lock();
 		}
 

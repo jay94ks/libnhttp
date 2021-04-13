@@ -51,7 +51,7 @@ namespace nhttp {
 		int64_t n = 0;
 
 		while (*str && max--) {
-			int32_t c = *str++;
+			int32_t c = std::tolower(*str++);
 
 			if (!std::isalnum(c))
 				break;
@@ -63,9 +63,6 @@ namespace nhttp {
 
 			else if (c >= 'a' && c <= 'z')
 				n += (c - 'a') + 10;
-
-			else if (c >= 'A' && c <= 'Z')
-				n += (c - 'A') + 10;
 
 			else break;
 		}
