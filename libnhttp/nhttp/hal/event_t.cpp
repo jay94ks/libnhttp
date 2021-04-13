@@ -14,13 +14,8 @@ namespace hal {
 		pthread_cond_t cond;
 		bool condition, auto_reset;
 
-		inline pthread_mutex_t* as_mutex_ptr() {
-			return &mutex;
-		}
-
-		inline pthread_cond_t* as_cond_ptr() {
-			return &cond;
-		}
+		inline pthread_mutex_t* as_mutex_ptr() { return &mutex; }
+		inline pthread_cond_t* as_cond_ptr() { return &cond; }
 
 		~data_t() {
 			pthread_cond_destroy(as_cond_ptr());

@@ -16,7 +16,7 @@ namespace server {
 	class http_global_tags : public http_taggable { };
 
 	http_listener::http_listener(const socket_watcher& watcher, const http_params& params)
-		: http_raw_listener(watcher, params), flag_dtor(false), event(false, false)
+		: http_raw_listener(watcher, params), flag_dtor(false), event(false, false), waiters(0)
 	{
 		registry = std::make_shared<http_extension_registry>();
 		global_tags = std::make_shared<http_global_tags>();
