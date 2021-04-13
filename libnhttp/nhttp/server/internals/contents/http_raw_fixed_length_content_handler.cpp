@@ -18,7 +18,7 @@ namespace server {
 		size_t avail = buffer->get_left_capacity();
 		size_t chunk = buffer->get_chunk_size();
 
-		if (!feed->wanna_read())
+		if (feed && !feed->wanna_read())
 			return EVENT_AGAIN;
 
 		if (!buffer->get_size())

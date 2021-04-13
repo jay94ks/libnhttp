@@ -74,8 +74,8 @@ namespace server {
 		inline const http_query_string& get_queries() const { return raw->request.queries; }
 
 		/* get request headers. */
-		inline http_headers& get_headers() { return raw->response.headers; }
-		inline const http_headers& get_headers() const { return raw->response.headers; }
+		inline http_headers& get_headers() { return raw->request.headers; }
+		inline const http_headers& get_headers() const { return raw->request.headers; }
 
 		/* get request body stream. (read only) */
 		inline const std::shared_ptr<stream>& get_request_body() const { return raw->request.content; }

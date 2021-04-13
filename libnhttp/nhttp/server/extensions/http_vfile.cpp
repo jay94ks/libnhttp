@@ -136,7 +136,7 @@ namespace server {
 
         /* check client side E-Tag and m-time. */
         if ((if_none_match && !strnicmp(if_none_match, http_etag.c_str(), http_etag.size())) ||
-            (if_modified_since && c_mtime >= file_mtime))
+            (if_modified_since && c_mtime <= file_mtime))
         {
             response->status.set(304); // 304 Not Modified.
             return;

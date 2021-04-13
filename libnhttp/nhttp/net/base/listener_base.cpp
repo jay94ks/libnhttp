@@ -33,14 +33,20 @@ namespace base {
 			return false;
 		}
 
-		if (!sock.bind(ep) || !sock.listen(10)) {
+		if (!sock.bind(ep)) {
+			sock.close();
+			return false;
+		}
+
+		raw.set_non_blocking(true);
+		raw.set_reuse_address(true);
+
+		if (!sock.listen(10)) {
 			sock.close();
 			return false;
 		}
 
 		sock.set_tag(dynamic_cast<listener_base*>(this), nullptr);
-		raw.set_non_blocking(true);
-		raw.set_reuse_address(true);
 
 		sources.push_back(sock);
 		watcher.watch(sock, [](socket_t sock) {
@@ -62,14 +68,20 @@ namespace base {
 			return false;
 		}
 
-		if (!sock.bind(ep) || !sock.listen(10)) {
+		if (!sock.bind(ep)) {
+			sock.close();
+			return false;
+		}
+
+		raw.set_non_blocking(true);
+		raw.set_reuse_address(true);
+
+		if (!sock.listen(10)) {
 			sock.close();
 			return false;
 		}
 
 		sock.set_tag(dynamic_cast<listener_base*>(this), nullptr);
-		raw.set_non_blocking(true);
-		raw.set_reuse_address(true);
 
 		sources.push_back(sock);
 		watcher.watch(sock, [](socket_t sock) {

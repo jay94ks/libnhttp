@@ -125,7 +125,7 @@ namespace hal {
 				break;
 			}
 
-			if (state == -1 && errno == ETIMEDOUT)
+			if (state == ETIMEDOUT || state == EINVAL)
 				break;
 		}
 

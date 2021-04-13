@@ -23,9 +23,17 @@ public:
 	}
 };
 
+int main_real(int argc, char** argv);
 int main(int argc, char** argv) {
+	int v = main_real(argc, argv);
+	return v;
+}
+
+int main_real(int argc, char** argv) {
 	socket_watcher watcher(1024);
 	http_listener listener(watcher, http_params());
+
+	ipv4::resolve("google.com", 443);
 
 	if (!listener.with(ipv4::resolve("0.0.0.0", 8080))) {
 		std::cout << "error: can't listen: 0.0.0.0:8080.\n";
@@ -75,22 +83,33 @@ int main(int argc, char** argv) {
 					return make_response(body);
 				}));
 
+			inner->put(":user/set", target_by([](http_request_ptr req) {
+				std::string body;
+
+				if (!req->get_request_body()->read_all(body))
+					return make_response(400);
+
+				return make_response(body);
+			}));
+
+			inner->delet(":user", target_by([](http_request_ptr req) {
+				std::string user = route_of(req).captures[":user"];
+
+				return make_response(user + " deleted!");
+			}));
+
 			inner->param(":user", [](const std::string& name) {
 				return name == "jay" || name == "kay";
 			});
 		});
 
-	/* Main thread as dispatcher. */
-	for(http_context_ptr context : listener) {
-		context->response = make_response("hello world");
-		context->close();
-
-		if (c++ > 10)
-			break;
-	}
+	time_t tt = time(nullptr);
 
 	/* Main thread as event thread. */
-	listener.run();
+	listener.run([&](auto) {
+		return time(nullptr) - tt < 60;
+	});
+	
 	
 	return 0;
 }
