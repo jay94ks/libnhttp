@@ -149,6 +149,10 @@ namespace server {
 				return -1;
 			}
 
+			if (is_end) {
+				break;
+			}
+
 			spinlock.unlock();
 			std::this_thread::yield();
 

@@ -60,17 +60,17 @@ namespace server {
 				return EVENT_FAILURE;
 			}
 
-			if (state.cont_phase == CONP_HEADER ||
-				state.cont_phase == CONP_BODY_END)
-			{
-				if (state.found_lf < 0) {
-					/* find LF from live buffer. */
-					if (void* t = memchr(live_buf, '\n', read)) {
-						size_t offset = size_t((uint8_t*)t - live_buf);
-						state.found_lf = ssize_t(buffer->get_size() + offset);
-					}
-				}
-			}
+			//if (state.cont_phase == CONP_HEADER ||
+			//	state.cont_phase == CONP_BODY_END)
+			//{
+			//	if (state.found_lf < 0) {
+			//		/* find LF from live buffer. */
+			//		if (void* t = memchr(live_buf, '\n', read)) {
+			//			size_t offset = size_t((uint8_t*)t - live_buf);
+			//			state.found_lf = ssize_t(buffer->get_size() + offset);
+			//		}
+			//	}
+			//}
 
 			/* skip bytes instead of pushing live_buf into buffer. */
 			if (skip_all && state.cont_left) {
@@ -144,7 +144,8 @@ namespace server {
 
 					if (cont_bytes) {
 						if (feed) {
-							feed->notify(cont_bytes, is_last_notify);
+							state.cont_notf += cont_bytes;
+							feed->notify(cont_bytes, false);
 						}
 
 						else buffer->skip(cont_bytes);
@@ -172,6 +173,9 @@ namespace server {
 					}
 				}
 
+				if (state.found_lf > 16)
+					return EVENT_FAILURE;
+
 				if (line_buf.size() < size_t(state.found_lf + 1))
 					line_buf.resize(state.found_lf + 1);
 
@@ -179,11 +183,15 @@ namespace server {
 				state.cont_mark -= state.found_lf + 1;
 
 				if (state.cont_read <= 0) {
+					if (feed) {
+						feed->notify(0, true);
+					}
+
 					return EVENT_SUCCESS;
 				}
 
 				state.cont_phase = CONP_HEADER;
-				state.found_lf = buffer->find('\n');
+				state.found_lf = -1;
 			}
 		}
 

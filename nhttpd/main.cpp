@@ -120,7 +120,7 @@ int main_real(int argc, char** argv) {
 	time_t tt = time(nullptr);
 	/* Main thread as event thread. */
 	listener.run([&](auto) {
-		return time(nullptr) - tt < 60;
+		return true; //time(nullptr) - tt < 60;
 	});
 	
 	

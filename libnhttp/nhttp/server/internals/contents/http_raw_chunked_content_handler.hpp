@@ -18,6 +18,7 @@ namespace server {
 
 			uint64_t cont_left;
 			uint64_t cont_read;
+			uint64_t cont_notf;
 			int64_t cont_mark;
 		} state = { 0, };
 

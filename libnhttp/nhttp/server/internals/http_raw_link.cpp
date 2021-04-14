@@ -315,6 +315,10 @@ namespace server {
 					else if (socket.get_local_addr(_ipv4))
 						current->port = int32_t(_ipv4.port);
 
+					/* qualify path name. */
+					current->request.target.set_path(
+						qualify_path(current->request.target.get_path()));
+
 					/**
 					 * remove port number from hostname.
 					 */
@@ -393,7 +397,6 @@ namespace server {
 							current->request.content = content_handler->feed;
 						}
 					}
-
 
 					/* parse query-string. */
 					http_query_string::try_parse(
