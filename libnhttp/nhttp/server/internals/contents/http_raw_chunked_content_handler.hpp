@@ -13,7 +13,7 @@ namespace server {
 		struct {
 			int8_t read_more : 1;
 			int8_t cont_phase : 3; /* 0: header, 1: body, 2: body-end */
-
+			uint8_t cont_end : 1;
 			ssize_t found_lf;
 
 			uint64_t cont_left;

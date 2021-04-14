@@ -31,8 +31,10 @@ namespace server {
 			 * if buffered length is longer than 2 * chunk,
 			 * wait until buffered bytes being read.
 			 */
-			if (size >= (chunk << 1))
+			if (size >= (chunk << 1)) {
+				state.read_more = 0;
 				return EVENT_AGAIN;
+			}
 
 			/* try preallocate more chunks. */
 			if (!buffer->preallocate() && !avail)

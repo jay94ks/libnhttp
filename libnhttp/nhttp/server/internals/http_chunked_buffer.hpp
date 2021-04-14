@@ -142,9 +142,6 @@ namespace server {
 
 				buf = (uint8_t*)buf + avail;
 				len -= avail;
-
-				length -= avail;
-
 			}
 
 			return read_len;
