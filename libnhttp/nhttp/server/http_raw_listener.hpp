@@ -15,12 +15,17 @@ namespace server {
 	class http_raw_context;
 	class http_raw_link;
 
+namespace drivers {
+	class http_default_driver;
+}
+
 	/**
 	 * class http_raw_listener.
 	 * http listener for accepting http sessions.
 	 */
 	class http_raw_listener : public base::listener_base {
 		friend class http_raw_link;
+		friend class drivers::http_default_driver;
 
 	private:
 		http_params params;

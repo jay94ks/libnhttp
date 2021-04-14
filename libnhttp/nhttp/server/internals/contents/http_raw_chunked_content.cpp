@@ -1,12 +1,21 @@
 #include "http_raw_chunked_content_handler.hpp"
+#include "http_raw_request_content.hpp"
 #include "../../../utils/strings.hpp"
 
 #include "../http_raw_link.hpp"
 #include "../http_chunked_buffer.hpp"
-#include "../http_raw_request_content.hpp"
+#include "../drivers/http_default_driver.hpp"
 
 namespace nhttp {
 namespace server {
+	/* redirect event control codes to. */
+	enum {
+		EVENT_FAILURE	= drivers::EVENT_FAILURE,
+		EVENT_AGAIN		= drivers::EVENT_AGAIN,
+		EVENT_RETRY		= drivers::EVENT_RETRY,
+		EVENT_SUCCESS	= drivers::EVENT_SUCCESS
+	};
+
 
 	void http_raw_chunked_content_handler::on_initiate() {
 		state.cont_mark = buffer->get_size();

@@ -13,11 +13,10 @@ namespace server {
 
 	class http_link;
 	class http_raw_link;
-
-	enum nhttp_protocol {
-		NPROTO_HTTP = 0,
-		NPROTO_WEBSOCKET
-	};
+	
+namespace drivers {
+	class http_default_driver;
+}
 
 	/**
 	 * class http_raw_request.
@@ -51,9 +50,9 @@ namespace server {
 	 */
 	class NHTTP_API http_raw_context {
 		friend class http_raw_link;
+		friend class drivers::http_default_driver;
 
 	public:
-		int32_t						protocol;
 		int32_t						port			= 0;
 		std::string					hostname;
 		std::string					local_addr;
@@ -65,9 +64,9 @@ namespace server {
 		std::shared_ptr<http_link>	link;
 		
 	private:
-		hal::spinlock_safe_t		spinlock;
-		http_raw_link*				raw_link;
-		bool						keepalive;
+		hal::spinlock_safe_t			spinlock;
+		drivers::http_default_driver*	driver;
+		bool							keepalive;
 		void(* _close)(http_raw_context&);
 
 	protected:
@@ -76,9 +75,9 @@ namespace server {
 		/**
 		 * configure raw_link to context.
 		 */
-		inline void configure(http_raw_link* raw_link, void(* _close)(http_raw_context&)) {
+		inline void configure(drivers::http_default_driver* driver, void(* _close)(http_raw_context&)) {
 			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			this->raw_link = raw_link;
+			this->driver = driver;
 			this->_close = _close;
 			is_quiet = false;
 		}
@@ -88,7 +87,7 @@ namespace server {
 		 */
 		inline void unconfigure() {
 			std::lock_guard<decltype(spinlock)> guard(spinlock);
-			this->raw_link = nullptr;
+			this->driver = nullptr;
 			this->_close = nullptr;
 			is_quiet = true;
 		}

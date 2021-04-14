@@ -1,6 +1,6 @@
 #pragma once
-#include "../../types.hpp"
-#include "../../net/socket.hpp"
+#include "../../../types.hpp"
+#include "../../../net/socket.hpp"
 
 namespace nhttp {
 namespace server {

@@ -37,10 +37,7 @@ namespace xfwk {
 	 * class xfwk_router.
 	 * xfwk router: route http path to specified xfwk resources.
 	 */
-	class NHTTP_API xfwk_router 
-		: public http_vpath, 
-		  public xfwk_facade
-	{
+	class NHTTP_API xfwk_router : public http_vpath, public xfwk_facade {
 	private:
 		std::shared_ptr<xfwk_route> root_route;
 		std::shared_ptr<xfwk_middleware_stack> middlewares;

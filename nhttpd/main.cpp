@@ -61,8 +61,14 @@ int main_real(int argc, char** argv) {
 
 	auto my_ctrl = std::make_shared<my_controller>();
 
+	std::atomic<int32_t> exit(0);
+
 	router /* */
 		//->get(target_by(my_ctrl, &my_controller::hello))
+		->post("exit", target_by([&](auto) {
+			++exit;
+			return make_response("server exiting...");
+		}))
 		->get("whoami", target_by([](http_request_ptr) {
 			return make_response("I'm jay!");
 		}))
@@ -107,20 +113,11 @@ int main_real(int argc, char** argv) {
 			});
 		});
 
-	int32_t k = 0;
-	for (auto cont : listener) {
-		cont->response->status.set(404);
-		cont->close();
-
-		if (++k > 5) {
-			break;
-		}
-	}
-
 	time_t tt = time(nullptr);
+
 	/* Main thread as event thread. */
 	listener.run([&](auto) {
-		return true; //time(nullptr) - tt < 60;
+		return !exit;
 	});
 	
 	

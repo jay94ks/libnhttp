@@ -70,9 +70,6 @@
     <ClCompile Include="nhttp\server\extensions\http_vpath.cpp">
       <Filter>nhttp\server\extensions</Filter>
     </ClCompile>
-    <ClCompile Include="nhttp\server\internals\http_raw_link.cpp">
-      <Filter>nhttp\server\internals</Filter>
-    </ClCompile>
     <ClCompile Include="nhttp\server\extensions\http_vfile.cpp">
       <Filter>nhttp\server\extensions</Filter>
     </ClCompile>
@@ -91,14 +88,8 @@
     <ClCompile Include="nhttp\server\xfwk\xfwk_route.cpp">
       <Filter>nhttp\server\xfwk</Filter>
     </ClCompile>
-    <ClCompile Include="nhttp\server\xfwk\xfwk_websocket_target.cpp">
-      <Filter>nhttp\server\xfwk</Filter>
-    </ClCompile>
     <ClCompile Include="nhttp\server\extensions\http_websock_ep.cpp">
       <Filter>nhttp\server\extensions</Filter>
-    </ClCompile>
-    <ClCompile Include="nhttp\server\internals\http_raw_request_content.cpp">
-      <Filter>nhttp\server\internals</Filter>
     </ClCompile>
     <ClCompile Include="nhttp\server\internals\contents\http_raw_fixed_length_content_handler.cpp">
       <Filter>nhttp\server\internals\contents</Filter>
@@ -107,6 +98,15 @@
       <Filter>nhttp\server\internals\contents</Filter>
     </ClCompile>
     <ClCompile Include="nhttp\server\internals\contents\http_raw_websocket_content_handler.cpp">
+      <Filter>nhttp\server\internals\contents</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\internals\http_raw_link.cpp">
+      <Filter>nhttp\server\internals</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\internals\drivers\http_default_driver.cpp">
+      <Filter>nhttp\server\internals\drivers</Filter>
+    </ClCompile>
+    <ClCompile Include="nhttp\server\internals\contents\http_raw_request_content.cpp">
       <Filter>nhttp\server\internals\contents</Filter>
     </ClCompile>
   </ItemGroup>
@@ -164,6 +164,9 @@
     </Filter>
     <Filter Include="nhttp\server\internals\contents">
       <UniqueIdentifier>{2102c883-ee96-45d5-8b36-f49aeaf3d22a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nhttp\server\internals\drivers">
+      <UniqueIdentifier>{a9e7c3bd-3a08-4f9f-98f8-c89ee4736144}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -293,9 +296,6 @@
     <ClInclude Include="nhttp\server\http_params.hpp">
       <Filter>nhttp\server</Filter>
     </ClInclude>
-    <ClInclude Include="nhttp\server\internals\http_raw_request_content.hpp">
-      <Filter>nhttp\server\internals</Filter>
-    </ClInclude>
     <ClInclude Include="nhttp\server\http_listener.hpp">
       <Filter>nhttp\server</Filter>
     </ClInclude>
@@ -368,17 +368,11 @@
     <ClInclude Include="nhttp\depends\sha1\sha1.hpp">
       <Filter>nhttp\depends\sha1</Filter>
     </ClInclude>
-    <ClInclude Include="nhttp\server\xfwk\xfwk_websocket_target.hpp">
-      <Filter>nhttp\server\xfwk</Filter>
-    </ClInclude>
     <ClInclude Include="nhttp\server\extensions\http_websock_ep.hpp">
       <Filter>nhttp\server\extensions</Filter>
     </ClInclude>
     <ClInclude Include="nhttp\server\http_websock_message.hpp">
       <Filter>nhttp\server</Filter>
-    </ClInclude>
-    <ClInclude Include="nhttp\server\internals\http_raw_content_handler.hpp">
-      <Filter>nhttp\server\internals</Filter>
     </ClInclude>
     <ClInclude Include="nhttp\server\internals\contents\http_raw_fixed_length_content_handler.hpp">
       <Filter>nhttp\server\internals\contents</Filter>
@@ -387,6 +381,15 @@
       <Filter>nhttp\server\internals\contents</Filter>
     </ClInclude>
     <ClInclude Include="nhttp\server\internals\contents\http_raw_websocket_content_handler.hpp">
+      <Filter>nhttp\server\internals\contents</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\drivers\http_default_driver.hpp">
+      <Filter>nhttp\server\internals\drivers</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\contents\http_raw_request_content.hpp">
+      <Filter>nhttp\server\internals\contents</Filter>
+    </ClInclude>
+    <ClInclude Include="nhttp\server\internals\contents\http_raw_content_handler.hpp">
       <Filter>nhttp\server\internals\contents</Filter>
     </ClInclude>
   </ItemGroup>

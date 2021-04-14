@@ -90,6 +90,7 @@ run-test-app: test-app
 	dd if=/dev/zero of=test.bin bs=102400 count=1024; true
 	wget -O temp.bin "http://[::1]:8080/test.bin"
 	rm -rf test.bin temp.bin
+	curl -d @index.html -v -H "Content-Type: application/octet-steam" -X POST "http://127.0.0.1:8080/exit"; true
 
 coverage.info:
 	lcov --capture --output-file coverage.info --directory . --base-directory "." --no-external
