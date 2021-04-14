@@ -1,8 +1,13 @@
 #pragma once
-#include "http_raw_content_handler.hpp"
+#include "../../http_link.hpp"
 
 namespace nhttp {
-namespace server {
+	class stream;
+
+namespace server {	
+	class http_websocket;
+
+namespace drivers {
 
 	/**
 	 *	0               1               2               3
@@ -71,45 +76,40 @@ namespace server {
 		"error: compiler can't generate frame header structure packed!" );
 
 	/**
-	 * class http_raw_websocket_content_handler.
-	 * handles websocket data-frames.
+	 * class http_websocket_driver.
+	 * handles websocket connection's activities.
 	 */
-	class NHTTP_API http_raw_websocket_content_handler
-		: public http_raw_content_handler
-	{
+	class NHTTP_API http_websocket_driver : public http_link_driver {
 	private:
-		inline void on_reset() { on_finalize(); on_initiate(); }
+		hal::spinlock_safe_t spinlock;
 
-	private:
-		hws_frame frame_hdr;
-		uint16_t frame_hdr_sz;
+		std::shared_ptr<http_websocket> websocket;
+		std::queue<std::tuple<std::shared_ptr<stream>, bool>> queue;
 
-		hws_frame frame_cur;
+		hws_frame frame_hdr = { 0, }, 
+				  frame_cur = { 0, };
 
-		struct {
-			int8_t read_more : 1;
-			int8_t frame_mode : 3; // 0: none, 1: _n_1, 2: _n_2, 3: _n_8. */
+		uint16_t  frame_hdr_sz;
+		std::atomic<int8_t> wanna_close;
 
-			int64_t cont_mark;
-			int64_t cont_phase;
+		uint8_t has_open;
 
-			uint32_t mask_key;
-			uint64_t cont_plen;
-		} state;
+
 	public:
-		/* initiate content handler. */
-		virtual void on_initiate() override;
+		http_websocket_driver(const std::shared_ptr<http_websocket>& websocket);
 
-		/* finalize and cleanup content handler. */
+	protected:
+		virtual void on_initiate(const socket_t& socket,
+			const std::shared_ptr<asyncs::context>& asyncs,
+			const std::shared_ptr<http_chunked_buffer>& buffer,
+			const std::shared_ptr<http_link>& link) override;
+
 		virtual void on_finalize() override;
 
-		/* handle socket events for feeding content. */
-		virtual int32_t on_event(socket_t& socket) override;
-
-		int32_t on_event_n1(socket_t& socket);
-		int32_t on_event_n2(socket_t& socket);
-		int32_t on_event_n8(socket_t& socket);
+	protected:
+		virtual bool on_event() override;
 	};
 
+}
 }
 }

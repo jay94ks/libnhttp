@@ -30,6 +30,7 @@ namespace server {
 
 		/* configure default protocol driver. */
 		driver = std::make_shared<drivers::http_default_driver>(listener, this);
+		driver->raw_link = this;
 
 		/* initiate protocol driver.*/
 		driver->on_initiate(socket, asyncs, buffer, link);
@@ -43,6 +44,7 @@ namespace server {
 		driver->on_finalize();
 		link->_is_alive.store(false);
 
+		driver->raw_link = nullptr;
 		driver = nullptr;
 		link = nullptr;
 
@@ -51,10 +53,28 @@ namespace server {
 	
 	bool http_raw_link::on_event() {
 		/* wait completion if future task didn't finished. */
-		return driver->on_event();
-	}
+		if (future_holder && !future_holder.is_completed())
+			return true;
 
-	void http_raw_link::switch_driver(std::shared_ptr<http_link_driver> driver) {
+		bool retval = driver->on_event();
+		if ( retval && replace_to) {
+			future_holder = asyncs->future_of([this]() {
+				std::shared_ptr<http_link_driver> target;
+				std::swap(target, replace_to);
+
+				/* switch link driver in here. */
+				driver->on_finalize();
+				driver->raw_link = nullptr;
+
+				std::swap(target, driver);
+				driver->raw_link = this;
+				driver->on_initiate(socket, asyncs, buffer, link);
+			});
+
+			return true;
+		}
+
+		return retval;
 	}
 
 }

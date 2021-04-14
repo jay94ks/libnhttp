@@ -9,6 +9,7 @@
 #include "../../../io/stream.hpp"
 #include "../../http_raw_context.hpp"
 #include "../../http_raw_listener.hpp"
+#include "../http_raw_link.hpp"
 
 namespace nhttp {
 namespace server {
@@ -107,8 +108,7 @@ namespace drivers {
 				}
 
 				current = nullptr;
-				timestamp = time(nullptr);
-
+				
 				/* if line_buf is larger than half chunk, make it less than. */
 				if (line_buf.size() > params.buffer_size_in_kb * 512)
 					line_buf.resize(params.buffer_size_in_kb * 512);
@@ -118,13 +118,17 @@ namespace drivers {
 					break;
 				}
 
-				/* if failed to lock at oneshot, no-link hook configured. */
-				/*if (!driver && link->spinlock.try_lock()) {
-					driver = link->driver;
-					link->spinlock.unlock();
-				}*/
+				/* if driver replaced, escape without resetting states. */
+				if (int32_t val = replace_driver()) {
+					if (val < 0)
+						return false;
 
+					return true;
+				}
+
+				timestamp = time(nullptr);
 				reset_states();
+
 				ret = EVENT_SUCCESS;
 				break;
 			}

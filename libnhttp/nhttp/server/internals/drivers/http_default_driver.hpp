@@ -103,12 +103,12 @@ namespace drivers {
 		virtual void on_initiate(const socket_t& socket,
 			const std::shared_ptr<asyncs::context>& asyncs,
 			const std::shared_ptr<http_chunked_buffer>& buffer,
-			const std::shared_ptr<http_link>& link);
+			const std::shared_ptr<http_link>& link) override;
 
-		virtual void on_finalize();
+		virtual void on_finalize() override;
 
 	protected:
-		virtual bool on_event();
+		virtual bool on_event() override;
 
 	private:
 		int32_t on_receive();

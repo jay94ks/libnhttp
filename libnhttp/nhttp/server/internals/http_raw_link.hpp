@@ -12,26 +12,22 @@ namespace nhttp {
 namespace server {
 	class http_raw_listener;
 	class http_chunked_buffer;
-	
-namespace drivers {
-	class http_default_driver;
-}
 
 	/**
 	 * class http_raw_link.
 	 * http link which handles connection itself.
 	 */
 	class NHTTP_API http_raw_link : public base::session_base {
-		friend class drivers::http_default_driver;
+		friend class http_link_driver;
 
 	private:
 		http_params params;
 		http_raw_listener* listener;
-
 		future<void> future_holder;
 
 		std::shared_ptr<http_link> link;
 		std::shared_ptr<http_link_driver> driver;
+		std::shared_ptr<http_link_driver> replace_to;
 		std::shared_ptr<http_chunked_buffer> buffer;
 
 	public:
@@ -49,7 +45,13 @@ namespace drivers {
 		virtual bool on_event() override;
 
 	protected:
-		void switch_driver(std::shared_ptr<http_link_driver> driver);
+		/* set driver replacement. */
+		inline void on_replace(std::shared_ptr<http_link_driver> driver) {
+			if (this->driver == driver)
+				return;
+
+			replace_to = driver;
+		}
 	};
 
 }
