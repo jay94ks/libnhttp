@@ -1,4 +1,4 @@
-#include "tests.hpp"
+ï»¿#include "tests.hpp"
 #include <nhttp/utils/urlencode.hpp>
 #include <nhttp/utils/this_ptr.hpp>
 #include <nhttp/utils/strings.hpp>
@@ -98,12 +98,12 @@ void test_strings() {
 		std::cout << " : to_hex32(xx, 0x1234) should return \"1234\"\n";
 	}
 
-	if (nhttp::wcs_to_mbs(L"abcd ÇÑ±Û") != u8"abcd ÇÑ±Û") {
-		std::cout << " : wcs_to_mbs(L\"abcd ÇÑ±Û\") should return u8\"abcd ÇÑ±Û\"\n";
+	if (nhttp::wcs_to_mbs(L"abcd í•œê¸€") != u8"abcd í•œê¸€") {
+		std::cout << " : wcs_to_mbs(L\"abcd í•œê¸€\") should return u8\"abcd í•œê¸€\"\n";
 	}
 
-	if (nhttp::mbs_to_wcs(u8"abcd ÇÑ±Û") != L"abcd ÇÑ±Û") {
-		std::cout << " : mbs_to_wcs(u8\"abcd ÇÑ±Û\") should return L\"abcd ÇÑ±Û\"\n";
+	if (nhttp::mbs_to_wcs(u8"abcd í•œê¸€") != L"abcd í•œê¸€") {
+		std::cout << " : mbs_to_wcs(u8\"abcd í•œê¸€\") should return L\"abcd í•œê¸€\"\n";
 	}
 
 	if (nhttp::hash_djb(nullptr, 0) != 5381) {

@@ -40,14 +40,15 @@ clean:
 	
 test-app: $(X_CVG_OBJECTS) $(C_CVG_OBJECTS)
 	cp ../libnhttp-tests/main.cpp test-main.cpp
-	cp -R ../libnhttp-tests/tests ./tests
+	mkdir -pv ./tests; true
+	cp -R ../libnhttp-tests/tests/* ./tests
 	g++ -o test-app test-main.cpp $(shell find `pwd`/tests -type f -regex ".*\.cpp") \
 		$(X_CVG_OBJECTS) $(C_CVG_OBJECTS) -I. \
 		-lgcov --coverage -fprofile-arcs -ftest-coverage -std=c++17 -lpthread
 
 run-test-app: test-app
 	./test-app &
-	sleep 1
+	sleep 30
 	curl -v "http://127.0.0.1:8080/?dummy=query-string&a=1,b=c&d=3"; true
 	curl -i "http://127.0.0.1:8080/" -H "Range: bytes=0-5"; true
 	curl -i -v -H "Range: bytes=0-" "http://127.0.0.1:8080/"; true

@@ -32,17 +32,17 @@
             <td></td>
             <td class="headerItem">Lines:</td>
             <td class="headerCovTableEntry">39</td>
-            <td class="headerCovTableEntry">45</td>
-            <td class="headerCovTableEntryMed">86.7 %</td>
+            <td class="headerCovTableEntry">44</td>
+            <td class="headerCovTableEntryMed">88.6 %</td>
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
-            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntry">14</td>
             <td class="headerCovTableEntry">17</td>
-            <td class="headerCovTableEntryMed">76.5 %</td>
+            <td class="headerCovTableEntryMed">82.4 %</td>
           </tr>
           <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
         </table>
@@ -94,16 +94,16 @@
 <a name="32"><span class="lineNum">      32 </span>            :                 std::shared_ptr&lt;http_raw_context&gt; raw;</a>
 <a name="33"><span class="lineNum">      33 </span>            : </a>
 <a name="34"><span class="lineNum">      34 </span>            :         public:</a>
-<a name="35"><span class="lineNum">      35 </span><span class="lineCov">        199 :                 http_request(const std::shared_ptr&lt;http_raw_context&gt;&amp; raw)</span></a>
-<a name="36"><span class="lineNum">      36 </span><span class="lineCov">        199 :                         : raw(raw) { }</span></a>
+<a name="35"><span class="lineNum">      35 </span><span class="lineCov">         82 :                 http_request(const std::shared_ptr&lt;http_raw_context&gt;&amp; raw)</span></a>
+<a name="36"><span class="lineNum">      36 </span><span class="lineCov">         82 :                         : raw(raw) { }</span></a>
 <a name="37"><span class="lineNum">      37 </span>            : </a>
-<a name="38"><span class="lineNum">      38 </span><span class="lineCov">        199 :                 ~http_request() {</span></a>
-<a name="39"><span class="lineNum">      39 </span><span class="lineCov">        265 :                         for (auto&amp; each : tags) {</span></a>
-<a name="40"><span class="lineNum">      40 </span><span class="lineCov">         66 :                                 each.second.dtor(each.second.data);</span></a>
+<a name="38"><span class="lineNum">      38 </span><span class="lineCov">         82 :                 ~http_request() {</span></a>
+<a name="39"><span class="lineNum">      39 </span><span class="lineCov">        112 :                         for (auto&amp; each : tags) {</span></a>
+<a name="40"><span class="lineNum">      40 </span><span class="lineCov">         30 :                                 each.second.dtor(each.second.data);</span></a>
 <a name="41"><span class="lineNum">      41 </span>            :                         }</a>
 <a name="42"><span class="lineNum">      42 </span>            : </a>
-<a name="43"><span class="lineNum">      43 </span><span class="lineCov">        199 :                         tags.clear();</span></a>
-<a name="44"><span class="lineNum">      44 </span><span class="lineCov">        199 :                 }</span></a>
+<a name="43"><span class="lineNum">      43 </span><span class="lineCov">         82 :                         tags.clear();</span></a>
+<a name="44"><span class="lineNum">      44 </span><span class="lineCov">         82 :                 }</span></a>
 <a name="45"><span class="lineNum">      45 </span>            : </a>
 <a name="46"><span class="lineNum">      46 </span>            :         public:</a>
 <a name="47"><span class="lineNum">      47 </span>            :                 /* form data. */</a>
@@ -111,7 +111,7 @@
 <a name="49"><span class="lineNum">      49 </span>            : </a>
 <a name="50"><span class="lineNum">      50 </span>            :         public:</a>
 <a name="51"><span class="lineNum">      51 </span>            :                 /* get raw link object. */</a>
-<a name="52"><span class="lineNum">      52 </span><span class="lineNoCov">          0 :                 inline std::shared_ptr&lt;http_link&gt; get_link() const { return raw-&gt;link; }</span></a>
+<a name="52"><span class="lineNum">      52 </span>            :                 inline std::shared_ptr&lt;http_link&gt; get_link() const { return raw-&gt;link; }</a>
 <a name="53"><span class="lineNum">      53 </span>            : </a>
 <a name="54"><span class="lineNum">      54 </span>            :                 /* get request timestamp. (read only) */</a>
 <a name="55"><span class="lineNum">      55 </span><span class="lineNoCov">          0 :                 inline time_t get_timestamp() const { return raw-&gt;request.timestamp; }</span></a>
@@ -120,7 +120,7 @@
 <a name="58"><span class="lineNum">      58 </span>            :                 inline int32_t get_port() const { return raw-&gt;port; }</a>
 <a name="59"><span class="lineNum">      59 </span>            : </a>
 <a name="60"><span class="lineNum">      60 </span>            :                 /* get request host name. (read only) */</a>
-<a name="61"><span class="lineNum">      61 </span><span class="lineCov">        199 :                 inline const std::string&amp; get_hostname() const { return raw-&gt;hostname; }</span></a>
+<a name="61"><span class="lineNum">      61 </span><span class="lineCov">         82 :                 inline const std::string&amp; get_hostname() const { return raw-&gt;hostname; }</span></a>
 <a name="62"><span class="lineNum">      62 </span>            : </a>
 <a name="63"><span class="lineNum">      63 </span>            :                 /* get local address. (read only) */</a>
 <a name="64"><span class="lineNum">      64 </span>            :                 inline const std::string&amp; get_local_addr() const { return raw-&gt;local_addr; }</a>
@@ -129,18 +129,18 @@
 <a name="67"><span class="lineNum">      67 </span>            :                 inline const std::string&amp; get_remote_addr() const { return raw-&gt;remote_addr; }</a>
 <a name="68"><span class="lineNum">      68 </span>            : </a>
 <a name="69"><span class="lineNum">      69 </span>            :                 /* get target resource information. (read only) */</a>
-<a name="70"><span class="lineNum">      70 </span><span class="lineCov">       1045 :                 inline const http_resource&amp; get_target() const { return raw-&gt;request.target; }</span></a>
+<a name="70"><span class="lineNum">      70 </span><span class="lineCov">        414 :                 inline const http_resource&amp; get_target() const { return raw-&gt;request.target; }</span></a>
 <a name="71"><span class="lineNum">      71 </span>            : </a>
 <a name="72"><span class="lineNum">      72 </span>            :                 /* get parsed query string. */</a>
 <a name="73"><span class="lineNum">      73 </span>            :                 inline http_query_string&amp; get_queries() { return raw-&gt;request.queries; }</a>
 <a name="74"><span class="lineNum">      74 </span>            :                 inline const http_query_string&amp; get_queries() const { return raw-&gt;request.queries; }</a>
 <a name="75"><span class="lineNum">      75 </span>            : </a>
 <a name="76"><span class="lineNum">      76 </span>            :                 /* get request headers. */</a>
-<a name="77"><span class="lineNum">      77 </span><span class="lineCov">         60 :                 inline http_headers&amp; get_headers() { return raw-&gt;request.headers; }</span></a>
+<a name="77"><span class="lineNum">      77 </span><span class="lineCov">          4 :                 inline http_headers&amp; get_headers() { return raw-&gt;request.headers; }</span></a>
 <a name="78"><span class="lineNum">      78 </span>            :                 inline const http_headers&amp; get_headers() const { return raw-&gt;request.headers; }</a>
 <a name="79"><span class="lineNum">      79 </span>            : </a>
 <a name="80"><span class="lineNum">      80 </span>            :                 /* get request body stream. (read only) */</a>
-<a name="81"><span class="lineNum">      81 </span><span class="lineCov">         46 :                 inline const std::shared_ptr&lt;stream&gt;&amp; get_request_body() const { return raw-&gt;request.content; }</span></a>
+<a name="81"><span class="lineNum">      81 </span><span class="lineCov">         12 :                 inline const std::shared_ptr&lt;stream&gt;&amp; get_request_body() const { return raw-&gt;request.content; }</span></a>
 <a name="82"><span class="lineNum">      82 </span>            :         };</a>
 <a name="83"><span class="lineNum">      83 </span>            : </a>
 <a name="84"><span class="lineNum">      84 </span>            :         /**</a>
@@ -152,24 +152,24 @@
 <a name="90"><span class="lineNum">      90 </span>            :                 http_response(const http_status&amp; status) { this-&gt;status = status; }</a>
 <a name="91"><span class="lineNum">      91 </span>            : </a>
 <a name="92"><span class="lineNum">      92 </span>            :                 /* shortcut of http_response(http_status::...). */</a>
-<a name="93"><span class="lineNum">      93 </span><span class="lineCov">        269 :                 http_response(int32_t code, const char* phrase = nullptr) {</span></a>
+<a name="93"><span class="lineNum">      93 </span><span class="lineCov">        102 :                 http_response(int32_t code, const char* phrase = nullptr) {</span></a>
 <a name="94"><span class="lineNum">      94 </span>            :                         NHTTP_ENSURE(code &gt;= 100 &amp;&amp; code &lt;= 515,</a>
 <a name="95"><span class="lineNum">      95 </span>            :                                 &quot;invalid http response code!&quot;);</a>
 <a name="96"><span class="lineNum">      96 </span>            : </a>
-<a name="97"><span class="lineNum">      97 </span><span class="lineCov">        269 :                         status.set(code, phrase);</span></a>
-<a name="98"><span class="lineNum">      98 </span><span class="lineCov">        269 :                 }</span></a>
+<a name="97"><span class="lineNum">      97 </span><span class="lineCov">        102 :                         status.set(code, phrase);</span></a>
+<a name="98"><span class="lineNum">      98 </span><span class="lineCov">        102 :                 }</span></a>
 <a name="99"><span class="lineNum">      99 </span>            : </a>
-<a name="100"><span class="lineNum">     100 </span><span class="lineCov">         56 :                 http_response(const std::string&amp; str, const http_mime_type&amp; mime = http_mime_type::TEXT_HTML) {</span></a>
-<a name="101"><span class="lineNum">     101 </span><span class="lineCov">        112 :                         (content = std::make_shared&lt;memory_stream&gt;())</span></a>
-<a name="102"><span class="lineNum">     102 </span><span class="lineCov">         56 :                                 -&gt;write(str.c_str(), str.size());</span></a>
+<a name="100"><span class="lineNum">     100 </span><span class="lineCov">         14 :                 http_response(const std::string&amp; str, const http_mime_type&amp; mime = http_mime_type::TEXT_HTML) {</span></a>
+<a name="101"><span class="lineNum">     101 </span><span class="lineCov">         28 :                         (content = std::make_shared&lt;memory_stream&gt;())</span></a>
+<a name="102"><span class="lineNum">     102 </span><span class="lineCov">         14 :                                 -&gt;write(str.c_str(), str.size());</span></a>
 <a name="103"><span class="lineNum">     103 </span>            : </a>
-<a name="104"><span class="lineNum">     104 </span><span class="lineCov">        112 :                         std::string s = mime.stringify();</span></a>
-<a name="105"><span class="lineNum">     105 </span><span class="lineCov">         56 :                         content-&gt;seek(0, SEEK_SET);</span></a>
+<a name="104"><span class="lineNum">     104 </span><span class="lineCov">         28 :                         std::string s = mime.stringify();</span></a>
+<a name="105"><span class="lineNum">     105 </span><span class="lineCov">         14 :                         content-&gt;seek(0, SEEK_SET);</span></a>
 <a name="106"><span class="lineNum">     106 </span>            : </a>
-<a name="107"><span class="lineNum">     107 </span><span class="lineCov">         56 :                         if (s.size() &gt; 0) {</span></a>
-<a name="108"><span class="lineNum">     108 </span><span class="lineCov">         56 :                                 headers.set(http_header::CONTENT_TYPE, s);</span></a>
+<a name="107"><span class="lineNum">     107 </span><span class="lineCov">         14 :                         if (s.size() &gt; 0) {</span></a>
+<a name="108"><span class="lineNum">     108 </span><span class="lineCov">         14 :                                 headers.set(http_header::CONTENT_TYPE, s);</span></a>
 <a name="109"><span class="lineNum">     109 </span>            :                         }</a>
-<a name="110"><span class="lineNum">     110 </span><span class="lineCov">         56 :                 }</span></a>
+<a name="110"><span class="lineNum">     110 </span><span class="lineCov">         14 :                 }</span></a>
 <a name="111"><span class="lineNum">     111 </span>            : </a>
 <a name="112"><span class="lineNum">     112 </span>            :                 http_response(const std::wstring&amp; str, const http_mime_type&amp; mime = http_mime_type::TEXT_HTML)</a>
 <a name="113"><span class="lineNum">     113 </span>            :                         : http_response(wcs_to_mbs(str), mime) { }</a>
@@ -200,8 +200,8 @@
 <a name="138"><span class="lineNum">     138 </span>            :          * make response object.</a>
 <a name="139"><span class="lineNum">     139 </span>            :          */</a>
 <a name="140"><span class="lineNum">     140 </span>            :         template&lt;typename ... types&gt;</a>
-<a name="141"><span class="lineNum">     141 </span><span class="lineCov">        126 :         inline http_response_ptr make_response(types&amp;&amp; ... args) {</span></a>
-<a name="142"><span class="lineNum">     142 </span><span class="lineCov">        126 :                 return std::make_shared&lt;http_response&gt;(std::forward&lt;types&gt;(args) ...);</span></a>
+<a name="141"><span class="lineNum">     141 </span><span class="lineCov">         34 :         inline http_response_ptr make_response(types&amp;&amp; ... args) {</span></a>
+<a name="142"><span class="lineNum">     142 </span><span class="lineCov">         34 :                 return std::make_shared&lt;http_response&gt;(std::forward&lt;types&gt;(args) ...);</span></a>
 <a name="143"><span class="lineNum">     143 </span>            :         }</a>
 <a name="144"><span class="lineNum">     144 </span>            : </a>
 <a name="145"><span class="lineNum">     145 </span>            :         /**</a>
@@ -217,13 +217,13 @@
 <a name="155"><span class="lineNum">     155 </span>            :                 bool _is_closed;</a>
 <a name="156"><span class="lineNum">     156 </span>            : </a>
 <a name="157"><span class="lineNum">     157 </span>            :         public:</a>
-<a name="158"><span class="lineNum">     158 </span><span class="lineCov">        199 :                 http_context(const std::shared_ptr&lt;http_raw_context&gt;&amp; raw)</span></a>
-<a name="159"><span class="lineNum">     159 </span><span class="lineCov">        199 :                         : raw(raw), _is_closed(false)</span></a>
+<a name="158"><span class="lineNum">     158 </span><span class="lineCov">         82 :                 http_context(const std::shared_ptr&lt;http_raw_context&gt;&amp; raw)</span></a>
+<a name="159"><span class="lineNum">     159 </span><span class="lineCov">         82 :                         : raw(raw), _is_closed(false)</span></a>
 <a name="160"><span class="lineNum">     160 </span>            :                 {</a>
-<a name="161"><span class="lineNum">     161 </span><span class="lineCov">        199 :                         request = std::make_shared&lt;http_request&gt;(raw);</span></a>
-<a name="162"><span class="lineNum">     162 </span><span class="lineCov">        199 :                         response = std::make_shared&lt;http_response&gt;(200);</span></a>
-<a name="163"><span class="lineNum">     163 </span><span class="lineCov">        199 :                         link = raw-&gt;link;</span></a>
-<a name="164"><span class="lineNum">     164 </span><span class="lineCov">        199 :                 }</span></a>
+<a name="161"><span class="lineNum">     161 </span><span class="lineCov">         82 :                         request = std::make_shared&lt;http_request&gt;(raw);</span></a>
+<a name="162"><span class="lineNum">     162 </span><span class="lineCov">         82 :                         response = std::make_shared&lt;http_response&gt;(200);</span></a>
+<a name="163"><span class="lineNum">     163 </span><span class="lineCov">         82 :                         link = raw-&gt;link;</span></a>
+<a name="164"><span class="lineNum">     164 </span><span class="lineCov">         82 :                 }</span></a>
 <a name="165"><span class="lineNum">     165 </span>            : </a>
 <a name="166"><span class="lineNum">     166 </span>            :         public:</a>
 <a name="167"><span class="lineNum">     167 </span>            :                 http_request_ptr request;</a>
@@ -238,36 +238,36 @@
 <a name="176"><span class="lineNum">     176 </span>            :                 }</a>
 <a name="177"><span class="lineNum">     177 </span>            : </a>
 <a name="178"><span class="lineNum">     178 </span>            :                 /* close context and send response. */</a>
-<a name="179"><span class="lineNum">     179 </span><span class="lineCov">        199 :                 inline bool close(bool keepalive = true) {</span></a>
+<a name="179"><span class="lineNum">     179 </span><span class="lineCov">         82 :                 inline bool close(bool keepalive = true) {</span></a>
 <a name="180"><span class="lineNum">     180 </span>            :                         NHTTP_ENSURE(</a>
 <a name="181"><span class="lineNum">     181 </span>            :                                 !_is_closed,</a>
 <a name="182"><span class="lineNum">     182 </span>            :                                 &quot;this stream is already closed.&quot;</a>
 <a name="183"><span class="lineNum">     183 </span>            :                         );</a>
 <a name="184"><span class="lineNum">     184 </span>            : </a>
-<a name="185"><span class="lineNum">     185 </span><span class="lineCov">        199 :                         if (!_is_closed) {</span></a>
+<a name="185"><span class="lineNum">     185 </span><span class="lineCov">         82 :                         if (!_is_closed) {</span></a>
 <a name="186"><span class="lineNum">     186 </span>            :                                 NHTTP_INIT_ASSERT(</a>
 <a name="187"><span class="lineNum">     187 </span>            :                                         request, </a>
 <a name="188"><span class="lineNum">     188 </span>            :                                         &quot;request object is overwritten at somewhere!&quot;</a>
 <a name="189"><span class="lineNum">     189 </span>            :                                 );</a>
 <a name="190"><span class="lineNum">     190 </span>            : </a>
-<a name="191"><span class="lineNum">     191 </span><span class="lineCov">        199 :                                 _is_closed = true;</span></a>
-<a name="192"><span class="lineNum">     192 </span><span class="lineCov">        199 :                                 if (!response) {</span></a>
+<a name="191"><span class="lineNum">     191 </span><span class="lineCov">         82 :                                 _is_closed = true;</span></a>
+<a name="192"><span class="lineNum">     192 </span><span class="lineCov">         82 :                                 if (!response) {</span></a>
 <a name="193"><span class="lineNum">     193 </span><span class="lineNoCov">          0 :                                         response = make_response(200);</span></a>
 <a name="194"><span class="lineNum">     194 </span>            :                                 }</a>
 <a name="195"><span class="lineNum">     195 </span>            : </a>
-<a name="196"><span class="lineNum">     196 </span><span class="lineCov">        199 :                                 if (request-&gt;hooks.size()) {</span></a>
+<a name="196"><span class="lineNum">     196 </span><span class="lineCov">         82 :                                 if (request-&gt;hooks.size()) {</span></a>
 <a name="197"><span class="lineNum">     197 </span><span class="lineNoCov">          0 :                                         for (auto each : request-&gt;hooks) {</span></a>
 <a name="198"><span class="lineNum">     198 </span><span class="lineNoCov">          0 :                                                 each-&gt;on_response(*request.get(), *response.get());</span></a>
 <a name="199"><span class="lineNum">     199 </span>            :                                         }</a>
 <a name="200"><span class="lineNum">     200 </span>            :                                 }</a>
 <a name="201"><span class="lineNum">     201 </span>            : </a>
 <a name="202"><span class="lineNum">     202 </span>            :                                 /* move assignment. */</a>
-<a name="203"><span class="lineNum">     203 </span><span class="lineCov">        199 :                                 raw-&gt;response.status = std::move(response-&gt;status);</span></a>
-<a name="204"><span class="lineNum">     204 </span><span class="lineCov">        199 :                                 raw-&gt;response.headers = std::move(response-&gt;headers);</span></a>
-<a name="205"><span class="lineNum">     205 </span><span class="lineCov">        199 :                                 raw-&gt;response.content = response-&gt;content;</span></a>
+<a name="203"><span class="lineNum">     203 </span><span class="lineCov">         82 :                                 raw-&gt;response.status = std::move(response-&gt;status);</span></a>
+<a name="204"><span class="lineNum">     204 </span><span class="lineCov">         82 :                                 raw-&gt;response.headers = std::move(response-&gt;headers);</span></a>
+<a name="205"><span class="lineNum">     205 </span><span class="lineCov">         82 :                                 raw-&gt;response.content = response-&gt;content;</span></a>
 <a name="206"><span class="lineNum">     206 </span>            : </a>
 <a name="207"><span class="lineNum">     207 </span>            :                                 /* then close context. */</a>
-<a name="208"><span class="lineNum">     208 </span><span class="lineCov">        199 :                                 return raw-&gt;close(keepalive);</span></a>
+<a name="208"><span class="lineNum">     208 </span><span class="lineCov">         82 :                                 return raw-&gt;close(keepalive);</span></a>
 <a name="209"><span class="lineNum">     209 </span>            :                         }</a>
 <a name="210"><span class="lineNum">     210 </span>            : </a>
 <a name="211"><span class="lineNum">     211 </span><span class="lineNoCov">          0 :                         return false;</span></a>

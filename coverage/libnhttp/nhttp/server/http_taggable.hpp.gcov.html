@@ -31,18 +31,18 @@
             <td class="headerValue">coverage.info</td>
             <td></td>
             <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntry">47</td>
+            <td class="headerCovTableEntry">46</td>
             <td class="headerCovTableEntry">73</td>
-            <td class="headerCovTableEntryLo">64.4 %</td>
+            <td class="headerCovTableEntryLo">63.0 %</td>
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">23</td>
-            <td class="headerCovTableEntry">42</td>
-            <td class="headerCovTableEntryLo">54.8 %</td>
+            <td class="headerCovTableEntry">41</td>
+            <td class="headerCovTableEntryLo">56.1 %</td>
           </tr>
           <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
         </table>
@@ -101,7 +101,7 @@
 <a name="39"><span class="lineNum">      39 </span>            : namespace _ {</a>
 <a name="40"><span class="lineNum">      40 </span>            :         template&lt;typename type, bool = std::is_base_of&lt;http_hook_tag, type&gt;::value&gt;</a>
 <a name="41"><span class="lineNum">      41 </span>            :         struct to_http_tag {</a>
-<a name="42"><span class="lineNum">      42 </span><span class="lineCov">        571 :                 inline static http_hook_tag* cast(type*) { return nullptr; }</span></a>
+<a name="42"><span class="lineNum">      42 </span><span class="lineCov">        246 :                 inline static http_hook_tag* cast(type*) { return nullptr; }</span></a>
 <a name="43"><span class="lineNum">      43 </span>            :         };</a>
 <a name="44"><span class="lineNum">      44 </span>            : </a>
 <a name="45"><span class="lineNum">      45 </span>            :         template&lt;typename type&gt;</a>
@@ -111,8 +111,8 @@
 <a name="49"><span class="lineNum">      49 </span>            : }</a>
 <a name="50"><span class="lineNum">      50 </span>            : </a>
 <a name="51"><span class="lineNum">      51 </span>            :         template&lt;typename type&gt;</a>
-<a name="52"><span class="lineNum">      52 </span><span class="lineCov">        571 :         inline http_hook_tag* to_http_tag(type* ptr) {</span></a>
-<a name="53"><span class="lineNum">      53 </span><span class="lineCov">        571 :                 return _::to_http_tag&lt;type&gt;::cast(ptr);</span></a>
+<a name="52"><span class="lineNum">      52 </span><span class="lineCov">        246 :         inline http_hook_tag* to_http_tag(type* ptr) {</span></a>
+<a name="53"><span class="lineNum">      53 </span><span class="lineCov">        246 :                 return _::to_http_tag&lt;type&gt;::cast(ptr);</span></a>
 <a name="54"><span class="lineNum">      54 </span>            :         }</a>
 <a name="55"><span class="lineNum">      55 </span>            : </a>
 <a name="56"><span class="lineNum">      56 </span>            :         /**</a>
@@ -136,14 +136,14 @@
 <a name="74"><span class="lineNum">      74 </span>            :                 std::vector&lt;http_hook_tag*&gt; hooks;</a>
 <a name="75"><span class="lineNum">      75 </span>            : </a>
 <a name="76"><span class="lineNum">      76 </span>            :         public:</a>
-<a name="77"><span class="lineNum">      77 </span><span class="lineCov">        393 :                 http_taggable() { }</span></a>
-<a name="78"><span class="lineNum">      78 </span><span class="lineCov">        393 :                 virtual ~http_taggable() {</span></a>
-<a name="79"><span class="lineNum">      79 </span><span class="lineCov">        898 :                         for (auto&amp; each : tags) {</span></a>
-<a name="80"><span class="lineNum">      80 </span><span class="lineCov">        505 :                                 each.second.dtor(each.second.data);</span></a>
+<a name="77"><span class="lineNum">      77 </span><span class="lineCov">        166 :                 http_taggable() { }</span></a>
+<a name="78"><span class="lineNum">      78 </span><span class="lineCov">        166 :                 virtual ~http_taggable() {</span></a>
+<a name="79"><span class="lineNum">      79 </span><span class="lineCov">        382 :                         for (auto&amp; each : tags) {</span></a>
+<a name="80"><span class="lineNum">      80 </span><span class="lineCov">        216 :                                 each.second.dtor(each.second.data);</span></a>
 <a name="81"><span class="lineNum">      81 </span>            :                         }</a>
 <a name="82"><span class="lineNum">      82 </span>            : </a>
-<a name="83"><span class="lineNum">      83 </span><span class="lineCov">        393 :                         tags.clear();</span></a>
-<a name="84"><span class="lineNum">      84 </span><span class="lineCov">        393 :                 }</span></a>
+<a name="83"><span class="lineNum">      83 </span><span class="lineCov">        166 :                         tags.clear();</span></a>
+<a name="84"><span class="lineNum">      84 </span><span class="lineCov">        166 :                 }</span></a>
 <a name="85"><span class="lineNum">      85 </span>            : </a>
 <a name="86"><span class="lineNum">      86 </span>            :         public:</a>
 <a name="87"><span class="lineNum">      87 </span>            :                 /**</a>
@@ -151,43 +151,43 @@
 <a name="89"><span class="lineNum">      89 </span>            :                  * if no tag set, new-tag set using default ctor.</a>
 <a name="90"><span class="lineNum">      90 </span>            :                  */</a>
 <a name="91"><span class="lineNum">      91 </span>            :                 template&lt;typename type&gt;</a>
-<a name="92"><span class="lineNum">      92 </span><span class="lineCov">        531 :                 inline type* ensured_tag() {</span></a>
-<a name="93"><span class="lineNum">      93 </span><span class="lineCov">        531 :                         type* tag_ptr = nullptr;</span></a>
-<a name="94"><span class="lineNum">      94 </span><span class="lineCov">        531 :                         lock.lock_write();</span></a>
+<a name="92"><span class="lineNum">      92 </span><span class="lineCov">        216 :                 inline type* ensured_tag() {</span></a>
+<a name="93"><span class="lineNum">      93 </span><span class="lineCov">        216 :                         type* tag_ptr = nullptr;</span></a>
+<a name="94"><span class="lineNum">      94 </span><span class="lineCov">        216 :                         lock.lock_write();</span></a>
 <a name="95"><span class="lineNum">      95 </span>            : </a>
-<a name="96"><span class="lineNum">      96 </span><span class="lineCov">        531 :                         const auto&amp; place = tags.find(typeid(type).hash_code());</span></a>
+<a name="96"><span class="lineNum">      96 </span><span class="lineCov">        216 :                         const auto&amp; place = tags.find(typeid(type).hash_code());</span></a>
 <a name="97"><span class="lineNum">      97 </span>            : </a>
-<a name="98"><span class="lineNum">      98 </span><span class="lineCov">        531 :                         if (place == tags.end()) {</span></a>
+<a name="98"><span class="lineNum">      98 </span><span class="lineCov">        216 :                         if (place == tags.end()) {</span></a>
 <a name="99"><span class="lineNum">      99 </span>            :                                 tag_type tag;</a>
 <a name="100"><span class="lineNum">     100 </span>            : </a>
-<a name="101"><span class="lineNum">     101 </span><span class="lineCov">        505 :                                 tag.data = tag_ptr = new type();</span></a>
-<a name="102"><span class="lineNum">     102 </span><span class="lineCov">       1010 :                                 tag.dtor = [](void* p) { delete (type*)p; };</span></a>
-<a name="103"><span class="lineNum">     103 </span><span class="lineCov">        505 :                                 tag.hook = to_http_tag((type*)tag.data);</span></a>
+<a name="101"><span class="lineNum">     101 </span><span class="lineCov">        216 :                                 tag.data = tag_ptr = new type();</span></a>
+<a name="102"><span class="lineNum">     102 </span><span class="lineCov">        432 :                                 tag.dtor = [](void* p) { delete (type*)p; };</span></a>
+<a name="103"><span class="lineNum">     103 </span><span class="lineCov">        216 :                                 tag.hook = to_http_tag((type*)tag.data);</span></a>
 <a name="104"><span class="lineNum">     104 </span>            : </a>
-<a name="105"><span class="lineNum">     105 </span><span class="lineCov">        505 :                                 set_tag_void(typeid(type).hash_code(), tag);</span></a>
+<a name="105"><span class="lineNum">     105 </span><span class="lineCov">        216 :                                 set_tag_void(typeid(type).hash_code(), tag);</span></a>
 <a name="106"><span class="lineNum">     106 </span>            :                         }</a>
 <a name="107"><span class="lineNum">     107 </span>            : </a>
-<a name="108"><span class="lineNum">     108 </span><span class="lineCov">         26 :                         else tag_ptr = (type*) place-&gt;second.data;</span></a>
+<a name="108"><span class="lineNum">     108 </span><span class="lineNoCov">          0 :                         else tag_ptr = (type*) place-&gt;second.data;</span></a>
 <a name="109"><span class="lineNum">     109 </span>            : </a>
-<a name="110"><span class="lineNum">     110 </span><span class="lineCov">        531 :                         lock.unlock_write();</span></a>
-<a name="111"><span class="lineNum">     111 </span><span class="lineCov">        531 :                         return tag_ptr;</span></a>
+<a name="110"><span class="lineNum">     110 </span><span class="lineCov">        216 :                         lock.unlock_write();</span></a>
+<a name="111"><span class="lineNum">     111 </span><span class="lineCov">        216 :                         return tag_ptr;</span></a>
 <a name="112"><span class="lineNum">     112 </span>            :                 }</a>
 <a name="113"><span class="lineNum">     113 </span>            : </a>
 <a name="114"><span class="lineNum">     114 </span>            :                 /* get tag object pointer. */</a>
 <a name="115"><span class="lineNum">     115 </span>            :                 template&lt;typename type&gt;</a>
-<a name="116"><span class="lineNum">     116 </span><span class="lineCov">       1659 :                 inline type* get_tag_ptr() const {</span></a>
-<a name="117"><span class="lineNum">     117 </span><span class="lineCov">       1659 :                         lock.lock_read();</span></a>
-<a name="118"><span class="lineNum">     118 </span><span class="lineCov">       1659 :                         const auto&amp; place = tags.find(typeid(type).hash_code());</span></a>
+<a name="116"><span class="lineNum">     116 </span><span class="lineCov">        678 :                 inline type* get_tag_ptr() const {</span></a>
+<a name="117"><span class="lineNum">     117 </span><span class="lineCov">        678 :                         lock.lock_read();</span></a>
+<a name="118"><span class="lineNum">     118 </span><span class="lineCov">        678 :                         const auto&amp; place = tags.find(typeid(type).hash_code());</span></a>
 <a name="119"><span class="lineNum">     119 </span>            : </a>
-<a name="120"><span class="lineNum">     120 </span><span class="lineCov">       1659 :                         if (place != tags.end()) {</span></a>
-<a name="121"><span class="lineNum">     121 </span><span class="lineCov">       1287 :                                 auto* tag = (type*)place-&gt;second.data;</span></a>
-<a name="122"><span class="lineNum">     122 </span><span class="lineCov">       1287 :                                 lock.unlock_read();</span></a>
+<a name="120"><span class="lineNum">     120 </span><span class="lineCov">        678 :                         if (place != tags.end()) {</span></a>
+<a name="121"><span class="lineNum">     121 </span><span class="lineCov">        514 :                                 auto* tag = (type*)place-&gt;second.data;</span></a>
+<a name="122"><span class="lineNum">     122 </span><span class="lineCov">        514 :                                 lock.unlock_read();</span></a>
 <a name="123"><span class="lineNum">     123 </span>            : </a>
-<a name="124"><span class="lineNum">     124 </span><span class="lineCov">       1287 :                                 return tag;</span></a>
+<a name="124"><span class="lineNum">     124 </span><span class="lineCov">        514 :                                 return tag;</span></a>
 <a name="125"><span class="lineNum">     125 </span>            :                         }</a>
 <a name="126"><span class="lineNum">     126 </span>            : </a>
-<a name="127"><span class="lineNum">     127 </span><span class="lineCov">        372 :                         lock.unlock_read();</span></a>
-<a name="128"><span class="lineNum">     128 </span><span class="lineCov">        372 :                         return nullptr;</span></a>
+<a name="127"><span class="lineNum">     127 </span><span class="lineCov">        164 :                         lock.unlock_read();</span></a>
+<a name="128"><span class="lineNum">     128 </span><span class="lineCov">        164 :                         return nullptr;</span></a>
 <a name="129"><span class="lineNum">     129 </span>            :                 }</a>
 <a name="130"><span class="lineNum">     130 </span>            : </a>
 <a name="131"><span class="lineNum">     131 </span>            :                 /* set tag object by default ctor. */</a>
@@ -224,18 +224,18 @@
 <a name="162"><span class="lineNum">     162 </span>            : </a>
 <a name="163"><span class="lineNum">     163 </span>            :                 /* set tag object by move ctor. */</a>
 <a name="164"><span class="lineNum">     164 </span>            :                 template&lt;typename type&gt;</a>
-<a name="165"><span class="lineNum">     165 </span><span class="lineCov">         66 :                 inline type* set_tag(type&amp;&amp; value) {</span></a>
+<a name="165"><span class="lineNum">     165 </span><span class="lineCov">         30 :                 inline type* set_tag(type&amp;&amp; value) {</span></a>
 <a name="166"><span class="lineNum">     166 </span>            :                         tag_type tag;</a>
 <a name="167"><span class="lineNum">     167 </span>            : </a>
-<a name="168"><span class="lineNum">     168 </span><span class="lineCov">         66 :                         tag.data = new type(std::move(value));</span></a>
-<a name="169"><span class="lineNum">     169 </span><span class="lineCov">        132 :                         tag.dtor = [](void* p) { delete (type*)p; };</span></a>
-<a name="170"><span class="lineNum">     170 </span><span class="lineCov">         66 :                         tag.hook = to_http_tag((type*)tag.data);</span></a>
+<a name="168"><span class="lineNum">     168 </span><span class="lineCov">         30 :                         tag.data = new type(std::move(value));</span></a>
+<a name="169"><span class="lineNum">     169 </span><span class="lineCov">         60 :                         tag.dtor = [](void* p) { delete (type*)p; };</span></a>
+<a name="170"><span class="lineNum">     170 </span><span class="lineCov">         30 :                         tag.hook = to_http_tag((type*)tag.data);</span></a>
 <a name="171"><span class="lineNum">     171 </span>            : </a>
-<a name="172"><span class="lineNum">     172 </span><span class="lineCov">         66 :                         lock.lock_write();</span></a>
-<a name="173"><span class="lineNum">     173 </span><span class="lineCov">         66 :                         set_tag_void(typeid(type).hash_code(), tag);</span></a>
-<a name="174"><span class="lineNum">     174 </span><span class="lineCov">         66 :                         lock.unlock_write();</span></a>
+<a name="172"><span class="lineNum">     172 </span><span class="lineCov">         30 :                         lock.lock_write();</span></a>
+<a name="173"><span class="lineNum">     173 </span><span class="lineCov">         30 :                         set_tag_void(typeid(type).hash_code(), tag);</span></a>
+<a name="174"><span class="lineNum">     174 </span><span class="lineCov">         30 :                         lock.unlock_write();</span></a>
 <a name="175"><span class="lineNum">     175 </span>            : </a>
-<a name="176"><span class="lineNum">     176 </span><span class="lineCov">         66 :                         return (type*)tag.data;</span></a>
+<a name="176"><span class="lineNum">     176 </span><span class="lineCov">         30 :                         return (type*)tag.data;</span></a>
 <a name="177"><span class="lineNum">     177 </span>            :                 }</a>
 <a name="178"><span class="lineNum">     178 </span>            : </a>
 <a name="179"><span class="lineNum">     179 </span>            :                 template&lt;typename type&gt;</a>
@@ -248,10 +248,10 @@
 <a name="186"><span class="lineNum">     186 </span>            :                 }</a>
 <a name="187"><span class="lineNum">     187 </span>            : </a>
 <a name="188"><span class="lineNum">     188 </span>            :         private:</a>
-<a name="189"><span class="lineNum">     189 </span><span class="lineCov">        571 :                 inline bool unset_tag(size_t id) {</span></a>
-<a name="190"><span class="lineNum">     190 </span><span class="lineCov">        571 :                         const auto&amp; place = tags.find(id);</span></a>
+<a name="189"><span class="lineNum">     189 </span><span class="lineCov">        246 :                 inline bool unset_tag(size_t id) {</span></a>
+<a name="190"><span class="lineNum">     190 </span><span class="lineCov">        246 :                         const auto&amp; place = tags.find(id);</span></a>
 <a name="191"><span class="lineNum">     191 </span>            : </a>
-<a name="192"><span class="lineNum">     192 </span><span class="lineCov">        571 :                         if (place != tags.end()) {</span></a>
+<a name="192"><span class="lineNum">     192 </span><span class="lineCov">        246 :                         if (place != tags.end()) {</span></a>
 <a name="193"><span class="lineNum">     193 </span><span class="lineNoCov">          0 :                                 auto* hook = place-&gt;second.hook;</span></a>
 <a name="194"><span class="lineNum">     194 </span><span class="lineNoCov">          0 :                                 place-&gt;second.dtor(place-&gt;second.data);</span></a>
 <a name="195"><span class="lineNum">     195 </span>            : </a>
@@ -266,14 +266,14 @@
 <a name="204"><span class="lineNum">     204 </span><span class="lineNoCov">          0 :                                 return true;</span></a>
 <a name="205"><span class="lineNum">     205 </span>            :                         }</a>
 <a name="206"><span class="lineNum">     206 </span>            : </a>
-<a name="207"><span class="lineNum">     207 </span><span class="lineCov">        571 :                         return false;</span></a>
+<a name="207"><span class="lineNum">     207 </span><span class="lineCov">        246 :                         return false;</span></a>
 <a name="208"><span class="lineNum">     208 </span>            :                 }</a>
 <a name="209"><span class="lineNum">     209 </span>            : </a>
-<a name="210"><span class="lineNum">     210 </span><span class="lineCov">        571 :                 inline void set_tag_void(size_t id, tag_type&amp; tag) {</span></a>
-<a name="211"><span class="lineNum">     211 </span><span class="lineCov">        571 :                         unset_tag(id);</span></a>
-<a name="212"><span class="lineNum">     212 </span><span class="lineCov">        571 :                         tags.emplace(id, tag);</span></a>
+<a name="210"><span class="lineNum">     210 </span><span class="lineCov">        246 :                 inline void set_tag_void(size_t id, tag_type&amp; tag) {</span></a>
+<a name="211"><span class="lineNum">     211 </span><span class="lineCov">        246 :                         unset_tag(id);</span></a>
+<a name="212"><span class="lineNum">     212 </span><span class="lineCov">        246 :                         tags.emplace(id, tag);</span></a>
 <a name="213"><span class="lineNum">     213 </span>            : </a>
-<a name="214"><span class="lineNum">     214 </span><span class="lineCov">        571 :                         if (tag.hook) {</span></a>
+<a name="214"><span class="lineNum">     214 </span><span class="lineCov">        246 :                         if (tag.hook) {</span></a>
 <a name="215"><span class="lineNum">     215 </span><span class="lineNoCov">          0 :                                 hooks.push_back(tag.hook);</span></a>
 <a name="216"><span class="lineNum">     216 </span>            : </a>
 <a name="217"><span class="lineNum">     217 </span><span class="lineNoCov">          0 :                                 std::sort(hooks.begin(), hooks.end(),</span></a>
@@ -282,7 +282,7 @@
 <a name="220"><span class="lineNum">     220 </span>            :                                         });</a>
 <a name="221"><span class="lineNum">     221 </span>            :                         }</a>
 <a name="222"><span class="lineNum">     222 </span>            : </a>
-<a name="223"><span class="lineNum">     223 </span><span class="lineCov">        571 :                 }</span></a>
+<a name="223"><span class="lineNum">     223 </span><span class="lineCov">        246 :                 }</span></a>
 <a name="224"><span class="lineNum">     224 </span>            :         };</a>
 <a name="225"><span class="lineNum">     225 </span>            : </a>
 <a name="226"><span class="lineNum">     226 </span>            : }</a>

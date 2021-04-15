@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">3</td>
@@ -122,13 +122,13 @@
 <a name="60"><span class="lineNum">      60 </span>            :         }</a>
 <a name="61"><span class="lineNum">      61 </span>            : </a>
 <a name="62"><span class="lineNum">      62 </span>            :         /* get current scoped sub-path. */</a>
-<a name="63"><span class="lineNum">      63 </span><span class="lineCov">        730 :         inline const std::string&amp; subpath_of(std::shared_ptr&lt;http_context&gt; context) {</span></a>
-<a name="64"><span class="lineNum">      64 </span><span class="lineCov">        730 :                 http_vpath_tag* tag = context-&gt;link-&gt;get_tag_ptr&lt;http_vpath_tag&gt;();</span></a>
+<a name="63"><span class="lineNum">      63 </span><span class="lineCov">        298 :         inline const std::string&amp; subpath_of(std::shared_ptr&lt;http_context&gt; context) {</span></a>
+<a name="64"><span class="lineNum">      64 </span><span class="lineCov">        298 :                 http_vpath_tag* tag = context-&gt;link-&gt;get_tag_ptr&lt;http_vpath_tag&gt;();</span></a>
 <a name="65"><span class="lineNum">      65 </span>            : </a>
-<a name="66"><span class="lineNum">      66 </span><span class="lineCov">        730 :                 if (tag &amp;&amp; tag-&gt;subpaths.size())</span></a>
+<a name="66"><span class="lineNum">      66 </span><span class="lineCov">        298 :                 if (tag &amp;&amp; tag-&gt;subpaths.size())</span></a>
 <a name="67"><span class="lineNum">      67 </span><span class="lineNoCov">          0 :                         return tag-&gt;subpaths.top();</span></a>
 <a name="68"><span class="lineNum">      68 </span>            : </a>
-<a name="69"><span class="lineNum">      69 </span><span class="lineCov">        730 :                 return context-&gt;request-&gt;get_target().get_path();</span></a>
+<a name="69"><span class="lineNum">      69 </span><span class="lineCov">        298 :                 return context-&gt;request-&gt;get_target().get_path();</span></a>
 <a name="70"><span class="lineNum">      70 </span>            :         }</a>
 <a name="71"><span class="lineNum">      71 </span>            : }</a>
 <a name="72"><span class="lineNum">      72 </span>            : }</a>
