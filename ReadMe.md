@@ -1,8 +1,8 @@
 # libnhttp
 
-<center>
-![logo](https://raw.githack.com/jay94ks/libnhttp/main/logo.png)
-</center>
+<p align="center">
+<img src="https://raw.githack.com/jay94ks/libnhttp/main/logo.png" />
+</p>
 
 Event-driven, streaming HTTP server implementation written in C++.
 
