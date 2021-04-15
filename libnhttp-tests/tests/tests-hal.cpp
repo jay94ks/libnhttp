@@ -29,7 +29,7 @@ void test_hal() {
 			rwlock.unlock_write();
 
 			std::this_thread::sleep_for(
-				std::chrono::microseconds(10)
+				std::chrono::milliseconds(10)
 			);
 
 			event.signal();
@@ -62,7 +62,7 @@ void test_hal() {
 			barrior.unlock();
 
 			std::this_thread::sleep_for(
-				std::chrono::microseconds(10)
+				std::chrono::milliseconds(10)
 			);
 
 			event.signal();
@@ -95,7 +95,7 @@ void test_hal() {
 			spinlock.unlock();
 
 			std::this_thread::sleep_for(
-				std::chrono::microseconds(10)
+				std::chrono::milliseconds(10)
 			);
 
 			event.signal();

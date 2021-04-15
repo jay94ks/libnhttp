@@ -15,12 +15,12 @@ void test_async() {
 	nhttp::future<int> test2 = context.future_of([]() {
 		std::cout << " : value returnning task.\n";
 		return 100;
-		});
+	});
 
 	nhttp::future<void> test3 = context.future_of([]() {
 		std::cout << " : sleeping, 1000 ms task.\n";
 		std::this_thread::sleep_for(
-			std::chrono::microseconds(1000)
+			std::chrono::milliseconds(1000)
 		);
 	});
 
