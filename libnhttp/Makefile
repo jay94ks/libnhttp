@@ -10,8 +10,8 @@ C_STATIC_OBJECTS := $(patsubst %.c,%.c.ao, $(C_SOURCES))
 X_SHARED_OBJECTS := $(patsubst %.cpp,%.cpp.po, $(X_SOURCES))
 C_SHARED_OBJECTS := $(patsubst %.c,%.c.po, $(C_SOURCES))
 
-CFLAGS=-O2
-CXXFLAGS=-O2 -std=c++17 -D__NHTTP_BUILD__
+CFLAGS=-O3
+CXXFLAGS=-O3 -std=c++17 -D__NHTTP_BUILD__
 
 CFLAGS_CVG=-O0 -lgcov -fprofile-arcs -ftest-coverage
 CXXFLAGS_CVG=-O0 -std=c++17 -D__NHTTP_BUILD__ -lgcov --coverage -fprofile-arcs -ftest-coverage
@@ -28,7 +28,7 @@ all: libnhttp.so libnhttp.a
 mk-deb: libnhttp.so
 	rm -rf deb; true
 	mkdir -pv deb
-	mkdir -pv deb/{DEBIAN,usr/local/{lib,include}}
+	mkdir -pv deb/{DEBIAN,usr/{lib,local/include}}
 	# generate control information.
 	echo "Package: libnhttp" > deb/DEBIAN/control
 	echo "Version: 1.0.0"	>> deb/DEBIAN/control
@@ -36,7 +36,6 @@ mk-deb: libnhttp.so
 	echo "Description: libnhttp for micro http server apps." >> deb/DEBIAN/control
 	echo "Homepage: https://github.com/jay94ks/libnhttp" >> deb/DEBIAN/control
 	echo "Architecture: amd64" >> deb/DEBIAN/control
-	echo "Depends: libpthread, librt" >> deb/DEBIAN/control
 	# generate configuration file list. (currently nothing)
 	# echo "" > deb/DEBIAN/conffiles
 	# generate pre-inst script. (currently nothing)
@@ -44,23 +43,23 @@ mk-deb: libnhttp.so
 	echo "" >> deb/DEBIAN/preinst
 	# generate post-inst script.
 	echo "#!/bin/bash" > deb/DEBIAN/postinst
-	echo "rm -rf /usr/local/lib/libnhttp.so" >> deb/DEBIAN/postinst
+	echo "rm -rf /usr/lib/libnhttp.so" >> deb/DEBIAN/postinst
 	echo "rm -rf /usr/local/include/nhttp" >> deb/DEBIAN/postinst
-	echo "ln -s /usr/local/lib/libnhttp.so.1.0.0 /usr/local/lib/libnhttp.so" >> deb/DEBIAN/postinst
+	echo "ln -s /usr/lib/libnhttp.so.1.0.0 /usr/lib/libnhttp.so" >> deb/DEBIAN/postinst
 	echo "ln -s /usr/local/include/nhttp.1.0.0 /usr/local/include/nhttp" >> deb/DEBIAN/postinst
 	# generate pre-remove script. (currently nothing)
 	echo "#!/bin/bash" > deb/DEBIAN/prerm
 	echo "" >> deb/DEBIAN/prerm
 	# generate post-remove script.
 	echo "#!/bin/bash" > deb/DEBIAN/postrm
-	echo "rm -rf /usr/local/lib/libnhttp.so" >> deb/DEBIAN/postrm
+	echo "rm -rf /usr/lib/libnhttp.so" >> deb/DEBIAN/postrm
 	echo "rm -rf /usr/local/include/nhttp" >> deb/DEBIAN/postrm
 	# copy entire source codes and remove *.cpp and *.c files.
 	cp -R ./nhttp deb/usr/local/include/nhttp.1.0.0
 	find ./deb/usr/local/include -type f -regex ".*\.cpp" -exec rm {} \;
 	find ./deb/usr/local/include -type f -regex ".*\.c" -exec rm {} \;
 	# copy .so file with version extension.
-	cp libnhttp.so deb/usr/local/lib/libnhttp.so.1.0.0
+	cp libnhttp.so deb/usr/lib/libnhttp.so.1.0.0
 	# build deb package.
 	chmod +x deb/DEBIAN/{preinst,postinst,prerm,postrm}
 	dpkg-deb -b deb/ libnhttp-1.0.0.deb
@@ -77,6 +76,9 @@ clean:
 	rm -rf coverage.info
 	rm -rf test-app
 	rm -rf test-main.cpp
+
+bench-app: libnhttp.so
+	g++ -O3 -o bench-app ../nhttpd/main.cpp -lpthread -lrt -lnhttp.so
 	
 test-app: $(X_CVG_OBJECTS) $(C_CVG_OBJECTS)
 	cp ../libnhttp-tests/main.cpp test-main.cpp
