@@ -31,17 +31,17 @@
             <td class="headerValue">coverage.info</td>
             <td></td>
             <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntry">19</td>
-            <td class="headerCovTableEntry">20</td>
-            <td class="headerCovTableEntryHi">95.0 %</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntryHi">95.5 %</td>
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
-            <td class="headerCovTableEntry">13</td>
-            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">15</td>
             <td class="headerCovTableEntryHi">100.0 %</td>
           </tr>
           <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
@@ -126,11 +126,11 @@
 <a name="64"><span class="lineNum">      64 </span>            :                 mutable int32_t err;</a>
 <a name="65"><span class="lineNum">      65 </span>            : </a>
 <a name="66"><span class="lineNum">      66 </span>            :         public:</a>
-<a name="67"><span class="lineNum">      67 </span><span class="lineCov">        196 :                 socket_raw_t(nullptr_t = nullptr)</span></a>
-<a name="68"><span class="lineNum">      68 </span><span class="lineCov">        196 :                         : fd(INVALID_SOCKET_FD), err(0) { }</span></a>
+<a name="67"><span class="lineNum">      67 </span><span class="lineCov">        103 :                 socket_raw_t(nullptr_t = nullptr)</span></a>
+<a name="68"><span class="lineNum">      68 </span><span class="lineCov">        103 :                         : fd(INVALID_SOCKET_FD), err(0) { }</span></a>
 <a name="69"><span class="lineNum">      69 </span>            : </a>
-<a name="70"><span class="lineNum">      70 </span><span class="lineCov">        196 :                 socket_raw_t(socket_fd_t fd, int32_t err = 0) </span></a>
-<a name="71"><span class="lineNum">      71 </span><span class="lineCov">        196 :                         : fd(fd), err(err) { }</span></a>
+<a name="70"><span class="lineNum">      70 </span><span class="lineCov">         97 :                 socket_raw_t(socket_fd_t fd, int32_t err = 0) </span></a>
+<a name="71"><span class="lineNum">      71 </span><span class="lineCov">         97 :                         : fd(fd), err(err) { }</span></a>
 <a name="72"><span class="lineNum">      72 </span>            : </a>
 <a name="73"><span class="lineNum">      73 </span>            :         private:</a>
 <a name="74"><span class="lineNum">      74 </span>            :                 static socket_fd_t create(bool v4, bool tcp);</a>
@@ -145,22 +145,22 @@
 <a name="83"><span class="lineNum">      83 </span>            : </a>
 <a name="84"><span class="lineNum">      84 </span>            :         public:</a>
 <a name="85"><span class="lineNum">      85 </span>            :                 template&lt;typename address_type = ipv4_addr, typename protocol = tcp&gt;</a>
-<a name="86"><span class="lineNum">      86 </span><span class="lineCov">         10 :                 inline static socket_raw_t create() {</span></a>
-<a name="87"><span class="lineNum">      87 </span><span class="lineCov">         10 :                         bool requires_v4 = std::is_same&lt;ipv4_addr, address_type&gt;::value;</span></a>
-<a name="88"><span class="lineNum">      88 </span><span class="lineCov">         10 :                         bool requires_tcp = std::is_same&lt;tcp, protocol&gt;::value;</span></a>
-<a name="89"><span class="lineNum">      89 </span><span class="lineCov">         10 :                         socket_raw_t sock = create(requires_v4, requires_tcp);</span></a>
+<a name="86"><span class="lineNum">      86 </span><span class="lineCov">         12 :                 inline static socket_raw_t create() {</span></a>
+<a name="87"><span class="lineNum">      87 </span><span class="lineCov">         12 :                         bool requires_v4 = std::is_same&lt;ipv4_addr, address_type&gt;::value;</span></a>
+<a name="88"><span class="lineNum">      88 </span><span class="lineCov">         12 :                         bool requires_tcp = std::is_same&lt;tcp, protocol&gt;::value;</span></a>
+<a name="89"><span class="lineNum">      89 </span><span class="lineCov">         12 :                         socket_raw_t sock = create(requires_v4, requires_tcp);</span></a>
 <a name="90"><span class="lineNum">      90 </span>            : </a>
-<a name="91"><span class="lineNum">      91 </span><span class="lineCov">         10 :                         if (sock.fd == INVALID_SOCKET_FD)</span></a>
+<a name="91"><span class="lineNum">      91 </span><span class="lineCov">         12 :                         if (sock.fd == INVALID_SOCKET_FD)</span></a>
 <a name="92"><span class="lineNum">      92 </span><span class="lineNoCov">          0 :                                 sock.err = get_last_error();</span></a>
 <a name="93"><span class="lineNum">      93 </span>            : </a>
-<a name="94"><span class="lineNum">      94 </span><span class="lineCov">         10 :                         return sock;</span></a>
+<a name="94"><span class="lineNum">      94 </span><span class="lineCov">         12 :                         return sock;</span></a>
 <a name="95"><span class="lineNum">      95 </span>            :                 }</a>
 <a name="96"><span class="lineNum">      96 </span>            : </a>
 <a name="97"><span class="lineNum">      97 </span>            :         public:</a>
-<a name="98"><span class="lineNum">      98 </span><span class="lineCov">        782 :                 inline bool is_valid() const { return fd != INVALID_SOCKET_FD; }</span></a>
-<a name="99"><span class="lineNum">      99 </span><span class="lineCov">   13059900 :                 inline int32_t error() const { return err; }</span></a>
+<a name="98"><span class="lineNum">      98 </span><span class="lineCov">    2030820 :                 inline bool is_valid() const { return fd != INVALID_SOCKET_FD; }</span></a>
+<a name="99"><span class="lineNum">      99 </span><span class="lineCov">     495032 :                 inline int32_t error() const { return err; }</span></a>
 <a name="100"><span class="lineNum">     100 </span>            :                 std::string error_str() const;</a>
-<a name="101"><span class="lineNum">     101 </span><span class="lineCov">        380 :                 inline socket_fd_t get_fd() const { return fd; }</span></a>
+<a name="101"><span class="lineNum">     101 </span><span class="lineCov">        185 :                 inline socket_fd_t get_fd() const { return fd; }</span></a>
 <a name="102"><span class="lineNum">     102 </span>            : </a>
 <a name="103"><span class="lineNum">     103 </span>            :         public:</a>
 <a name="104"><span class="lineNum">     104 </span>            :                 socket_raw_t clone();</a>
@@ -168,62 +168,68 @@
 <a name="106"><span class="lineNum">     106 </span>            :         private:</a>
 <a name="107"><span class="lineNum">     107 </span>            :                 bool check_return(int32_t ret_val) const;</a>
 <a name="108"><span class="lineNum">     108 </span>            :                 bool bind(void* data, size_t size);</a>
-<a name="109"><span class="lineNum">     109 </span>            : </a>
-<a name="110"><span class="lineNum">     110 </span>            :         public:</a>
-<a name="111"><span class="lineNum">     111 </span>            :                 template&lt;typename address_type&gt;</a>
-<a name="112"><span class="lineNum">     112 </span><span class="lineCov">         10 :                 inline bool bind(const address_type&amp; addr) {</span></a>
-<a name="113"><span class="lineNum">     113 </span><span class="lineCov">         10 :                         return bind((void*)&amp;addr, sizeof(address_type));</span></a>
-<a name="114"><span class="lineNum">     114 </span>            :                 }</a>
-<a name="115"><span class="lineNum">     115 </span>            : </a>
-<a name="116"><span class="lineNum">     116 </span>            :                 bool listen(int32_t backlog);</a>
-<a name="117"><span class="lineNum">     117 </span>            :                 socket_raw_t accept();</a>
-<a name="118"><span class="lineNum">     118 </span>            : </a>
-<a name="119"><span class="lineNum">     119 </span>            :         private:</a>
-<a name="120"><span class="lineNum">     120 </span>            :                 bool get_local_address(void* out, size_t size);</a>
-<a name="121"><span class="lineNum">     121 </span>            :                 bool get_remote_address(void* out, size_t size);</a>
-<a name="122"><span class="lineNum">     122 </span>            : </a>
-<a name="123"><span class="lineNum">     123 </span>            :         public:</a>
-<a name="124"><span class="lineNum">     124 </span>            :                 template&lt;typename address_type&gt;</a>
-<a name="125"><span class="lineNum">     125 </span><span class="lineCov">        784 :                 bool get_local_address(address_type&amp; out_addr) {</span></a>
-<a name="126"><span class="lineNum">     126 </span><span class="lineCov">        784 :                         return get_local_address(&amp;out_addr, sizeof(address_type));</span></a>
-<a name="127"><span class="lineNum">     127 </span>            :                 }</a>
+<a name="109"><span class="lineNum">     109 </span>            :                 bool connect(void* data, size_t size);</a>
+<a name="110"><span class="lineNum">     110 </span>            : </a>
+<a name="111"><span class="lineNum">     111 </span>            :         public:</a>
+<a name="112"><span class="lineNum">     112 </span>            :                 template&lt;typename address_type&gt;</a>
+<a name="113"><span class="lineNum">     113 </span><span class="lineCov">          8 :                 inline bool bind(const address_type&amp; addr) {</span></a>
+<a name="114"><span class="lineNum">     114 </span><span class="lineCov">          8 :                         return bind((void*)&amp;addr, sizeof(address_type));</span></a>
+<a name="115"><span class="lineNum">     115 </span>            :                 }</a>
+<a name="116"><span class="lineNum">     116 </span>            : </a>
+<a name="117"><span class="lineNum">     117 </span>            :                 template&lt;typename address_type&gt;</a>
+<a name="118"><span class="lineNum">     118 </span><span class="lineCov">          4 :                 inline bool connect(const address_type&amp; addr) {</span></a>
+<a name="119"><span class="lineNum">     119 </span><span class="lineCov">          4 :                         return connect((void*)&amp;addr, sizeof(address_type));</span></a>
+<a name="120"><span class="lineNum">     120 </span>            :                 }</a>
+<a name="121"><span class="lineNum">     121 </span>            : </a>
+<a name="122"><span class="lineNum">     122 </span>            :                 bool listen(int32_t backlog);</a>
+<a name="123"><span class="lineNum">     123 </span>            :                 socket_raw_t accept();</a>
+<a name="124"><span class="lineNum">     124 </span>            : </a>
+<a name="125"><span class="lineNum">     125 </span>            :         private:</a>
+<a name="126"><span class="lineNum">     126 </span>            :                 bool get_local_address(void* out, size_t size);</a>
+<a name="127"><span class="lineNum">     127 </span>            :                 bool get_remote_address(void* out, size_t size);</a>
 <a name="128"><span class="lineNum">     128 </span>            : </a>
-<a name="129"><span class="lineNum">     129 </span>            :                 template&lt;typename address_type&gt;</a>
-<a name="130"><span class="lineNum">     130 </span><span class="lineCov">        286 :                 bool get_remote_address(address_type&amp; out_addr) {</span></a>
-<a name="131"><span class="lineNum">     131 </span><span class="lineCov">        286 :                         return get_remote_address(&amp;out_addr, sizeof(address_type));</span></a>
-<a name="132"><span class="lineNum">     132 </span>            :                 }</a>
-<a name="133"><span class="lineNum">     133 </span>            : </a>
-<a name="134"><span class="lineNum">     134 </span>            :         private:</a>
-<a name="135"><span class="lineNum">     135 </span>            :                 bool get_option(int level, int optname, void* optval, socklen_t* optlen) const;</a>
-<a name="136"><span class="lineNum">     136 </span>            :                 bool set_option(int level, int optname, const void* optval, socklen_t optlen) const;</a>
-<a name="137"><span class="lineNum">     137 </span>            : </a>
-<a name="138"><span class="lineNum">     138 </span>            :         public:</a>
-<a name="139"><span class="lineNum">     139 </span>            :                 bool set_non_blocking(bool on);</a>
-<a name="140"><span class="lineNum">     140 </span>            :                 bool set_naggle_enabled(bool on);</a>
-<a name="141"><span class="lineNum">     141 </span>            :                 bool set_reuse_address(bool allow);</a>
-<a name="142"><span class="lineNum">     142 </span>            :                 bool set_read_timeout(int32_t millisec);</a>
-<a name="143"><span class="lineNum">     143 </span>            :                 bool set_write_timeout(int32_t millisec);</a>
-<a name="144"><span class="lineNum">     144 </span>            : </a>
-<a name="145"><span class="lineNum">     145 </span>            :                 /* to disable: call with 0, 0.*/</a>
-<a name="146"><span class="lineNum">     146 </span>            :                 bool set_keepalive(uint32_t idle, uint32_t interval, uint32_t count = 10);</a>
-<a name="147"><span class="lineNum">     147 </span>            : </a>
-<a name="148"><span class="lineNum">     148 </span>            :                 /* set linger, millisec &lt; 0: disable, millisec &gt;= 0 enable. */</a>
-<a name="149"><span class="lineNum">     149 </span>            :                 bool set_linger(int32_t millisec);</a>
+<a name="129"><span class="lineNum">     129 </span>            :         public:</a>
+<a name="130"><span class="lineNum">     130 </span>            :                 template&lt;typename address_type&gt;</a>
+<a name="131"><span class="lineNum">     131 </span><span class="lineCov">        328 :                 bool get_local_address(address_type&amp; out_addr) {</span></a>
+<a name="132"><span class="lineNum">     132 </span><span class="lineCov">        328 :                         return get_local_address(&amp;out_addr, sizeof(address_type));</span></a>
+<a name="133"><span class="lineNum">     133 </span>            :                 }</a>
+<a name="134"><span class="lineNum">     134 </span>            : </a>
+<a name="135"><span class="lineNum">     135 </span>            :                 template&lt;typename address_type&gt;</a>
+<a name="136"><span class="lineNum">     136 </span><span class="lineCov">        122 :                 bool get_remote_address(address_type&amp; out_addr) {</span></a>
+<a name="137"><span class="lineNum">     137 </span><span class="lineCov">        122 :                         return get_remote_address(&amp;out_addr, sizeof(address_type));</span></a>
+<a name="138"><span class="lineNum">     138 </span>            :                 }</a>
+<a name="139"><span class="lineNum">     139 </span>            : </a>
+<a name="140"><span class="lineNum">     140 </span>            :         private:</a>
+<a name="141"><span class="lineNum">     141 </span>            :                 bool get_option(int level, int optname, void* optval, socklen_t* optlen) const;</a>
+<a name="142"><span class="lineNum">     142 </span>            :                 bool set_option(int level, int optname, const void* optval, socklen_t optlen) const;</a>
+<a name="143"><span class="lineNum">     143 </span>            : </a>
+<a name="144"><span class="lineNum">     144 </span>            :         public:</a>
+<a name="145"><span class="lineNum">     145 </span>            :                 bool set_non_blocking(bool on);</a>
+<a name="146"><span class="lineNum">     146 </span>            :                 bool set_naggle_enabled(bool on);</a>
+<a name="147"><span class="lineNum">     147 </span>            :                 bool set_reuse_address(bool allow);</a>
+<a name="148"><span class="lineNum">     148 </span>            :                 bool set_read_timeout(int32_t millisec);</a>
+<a name="149"><span class="lineNum">     149 </span>            :                 bool set_write_timeout(int32_t millisec);</a>
 <a name="150"><span class="lineNum">     150 </span>            : </a>
-<a name="151"><span class="lineNum">     151 </span>            :         public:</a>
-<a name="152"><span class="lineNum">     152 </span>            :                 ssize_t read(void* buf, size_t n);</a>
-<a name="153"><span class="lineNum">     153 </span>            :                 ssize_t read_n(void* buf, size_t n);</a>
-<a name="154"><span class="lineNum">     154 </span>            : </a>
-<a name="155"><span class="lineNum">     155 </span>            :                 ssize_t write(const void* buf, size_t n);</a>
-<a name="156"><span class="lineNum">     156 </span>            :                 ssize_t write_n(const void* buf, size_t n);</a>
-<a name="157"><span class="lineNum">     157 </span>            : </a>
-<a name="158"><span class="lineNum">     158 </span>            :         public:</a>
-<a name="159"><span class="lineNum">     159 </span>            :                 bool shutdown(int how = SHUT_RDWR);</a>
-<a name="160"><span class="lineNum">     160 </span>            :                 bool close();</a>
-<a name="161"><span class="lineNum">     161 </span>            :         };</a>
-<a name="162"><span class="lineNum">     162 </span>            : </a>
-<a name="163"><span class="lineNum">     163 </span>            : }</a>
-<a name="164"><span class="lineNum">     164 </span>            : }</a>
+<a name="151"><span class="lineNum">     151 </span>            :                 /* to disable: call with 0, 0.*/</a>
+<a name="152"><span class="lineNum">     152 </span>            :                 bool set_keepalive(uint32_t idle, uint32_t interval, uint32_t count = 10);</a>
+<a name="153"><span class="lineNum">     153 </span>            : </a>
+<a name="154"><span class="lineNum">     154 </span>            :                 /* set linger, millisec &lt; 0: disable, millisec &gt;= 0 enable. */</a>
+<a name="155"><span class="lineNum">     155 </span>            :                 bool set_linger(int32_t millisec);</a>
+<a name="156"><span class="lineNum">     156 </span>            : </a>
+<a name="157"><span class="lineNum">     157 </span>            :         public:</a>
+<a name="158"><span class="lineNum">     158 </span>            :                 ssize_t read(void* buf, size_t n);</a>
+<a name="159"><span class="lineNum">     159 </span>            :                 //ssize_t read_n(void* buf, size_t n);</a>
+<a name="160"><span class="lineNum">     160 </span>            : </a>
+<a name="161"><span class="lineNum">     161 </span>            :                 ssize_t write(const void* buf, size_t n);</a>
+<a name="162"><span class="lineNum">     162 </span>            :                 //ssize_t write_n(const void* buf, size_t n);</a>
+<a name="163"><span class="lineNum">     163 </span>            : </a>
+<a name="164"><span class="lineNum">     164 </span>            :         public:</a>
+<a name="165"><span class="lineNum">     165 </span>            :                 bool shutdown(int how = SHUT_RDWR);</a>
+<a name="166"><span class="lineNum">     166 </span>            :                 bool close();</a>
+<a name="167"><span class="lineNum">     167 </span>            :         };</a>
+<a name="168"><span class="lineNum">     168 </span>            : </a>
+<a name="169"><span class="lineNum">     169 </span>            : }</a>
+<a name="170"><span class="lineNum">     170 </span>            : }</a>
 </pre>
       </td>
     </tr>

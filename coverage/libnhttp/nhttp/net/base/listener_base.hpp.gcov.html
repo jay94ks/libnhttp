@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">3</td>
@@ -110,10 +110,10 @@
 <a name="48"><span class="lineNum">      48 </span>            :                 /**</a>
 <a name="49"><span class="lineNum">      49 </span>            :                  * initialize a co-hosted listener.</a>
 <a name="50"><span class="lineNum">      50 </span>            :                  */</a>
-<a name="51"><span class="lineNum">      51 </span><span class="lineCov">          8 :                 listener_base(const socket_watcher&amp; watcher, int32_t workers) </span></a>
-<a name="52"><span class="lineNum">      52 </span><span class="lineCov">          8 :                         : watcher(watcher), terminating(false),</span></a>
+<a name="51"><span class="lineNum">      51 </span><span class="lineCov">          2 :                 listener_base(const socket_watcher&amp; watcher, int32_t workers) </span></a>
+<a name="52"><span class="lineNum">      52 </span><span class="lineCov">          2 :                         : watcher(watcher), terminating(false),</span></a>
 <a name="53"><span class="lineNum">      53 </span>            :                           workers(std::make_shared&lt;asyncs::context&gt;(workers)),</a>
-<a name="54"><span class="lineNum">      54 </span><span class="lineCov">          8 :                           alives(0) { }</span></a>
+<a name="54"><span class="lineNum">      54 </span><span class="lineCov">          2 :                           alives(0) { }</span></a>
 <a name="55"><span class="lineNum">      55 </span>            :                           </a>
 <a name="56"><span class="lineNum">      56 </span>            :                 /**</a>
 <a name="57"><span class="lineNum">      57 </span>            :                  * initialize a co-hosted listener.</a>
@@ -121,7 +121,7 @@
 <a name="59"><span class="lineNum">      59 </span>            :                 listener_base(const socket_watcher&amp; watcher, std::shared_ptr&lt;asyncs::context&gt; workers)</a>
 <a name="60"><span class="lineNum">      60 </span>            :                         : watcher(watcher), terminating(false), workers(workers), alives(0) { }</a>
 <a name="61"><span class="lineNum">      61 </span>            : </a>
-<a name="62"><span class="lineNum">      62 </span><span class="lineCov">          8 :                 virtual ~listener_base() { terminate(); }</span></a>
+<a name="62"><span class="lineNum">      62 </span><span class="lineCov">          2 :                 virtual ~listener_base() { terminate(); }</span></a>
 <a name="63"><span class="lineNum">      63 </span>            : </a>
 <a name="64"><span class="lineNum">      64 </span>            :         protected:</a>
 <a name="65"><span class="lineNum">      65 </span>            :                 void terminate();</a>
@@ -138,11 +138,11 @@
 <a name="76"><span class="lineNum">      76 </span><span class="lineCov">          2 :                 inline void run(coloop_type&amp;&amp; coloop) {</span></a>
 <a name="77"><span class="lineNum">      77 </span><span class="lineCov">          4 :                         std::queue&lt;socket_event&gt; events;</span></a>
 <a name="78"><span class="lineNum">      78 </span>            : </a>
-<a name="79"><span class="lineNum">      79 </span><span class="lineCov">   73336300 :                         while (coloop(nullptr)) {</span></a>
-<a name="80"><span class="lineNum">      80 </span><span class="lineCov">   73336300 :                                 watcher.wait(events, 100);</span></a>
+<a name="79"><span class="lineNum">      79 </span><span class="lineCov">     998862 :                         while (coloop(nullptr)) {</span></a>
+<a name="80"><span class="lineNum">      80 </span><span class="lineCov">     998860 :                                 watcher.wait(events, 100);</span></a>
 <a name="81"><span class="lineNum">      81 </span>            : </a>
-<a name="82"><span class="lineNum">      82 </span><span class="lineCov">   73336300 :                                 if (events.empty())</span></a>
-<a name="83"><span class="lineNum">      83 </span><span class="lineCov">   73336300 :                                         continue;</span></a>
+<a name="82"><span class="lineNum">      82 </span><span class="lineCov">     998860 :                                 if (events.empty())</span></a>
+<a name="83"><span class="lineNum">      83 </span><span class="lineCov">     998860 :                                         continue;</span></a>
 <a name="84"><span class="lineNum">      84 </span>            : </a>
 <a name="85"><span class="lineNum">      85 </span><span class="lineNoCov">          0 :                                 if (!coloop(&amp;events.front())) {</span></a>
 <a name="86"><span class="lineNum">      86 </span><span class="lineNoCov">          0 :                                         events.pop();</span></a>

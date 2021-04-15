@@ -31,17 +31,17 @@
             <td class="headerValue">coverage.info</td>
             <td></td>
             <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntry">15</td>
-            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntry">21</td>
             <td class="headerCovTableEntryHi">100.0 %</td>
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
-            <td class="headerCovTableEntry">8</td>
-            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntry">11</td>
             <td class="headerCovTableEntryHi">100.0 %</td>
           </tr>
           <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
@@ -83,7 +83,7 @@
 <a name="21"><span class="lineNum">      21 </span>            :                 int32_t _ver_minor;</a>
 <a name="22"><span class="lineNum">      22 </span>            : </a>
 <a name="23"><span class="lineNum">      23 </span>            :         public:</a>
-<a name="24"><span class="lineNum">      24 </span><span class="lineCov">        378 :                 http_resource() : _method(http_method::NONE), _path(&quot;/&quot;), _ver_major(1), _ver_minor(1) { }</span></a>
+<a name="24"><span class="lineNum">      24 </span><span class="lineCov">        166 :                 http_resource() : _method(http_method::NONE), _path(&quot;/&quot;), _ver_major(1), _ver_minor(1) { }</span></a>
 <a name="25"><span class="lineNum">      25 </span>            :                 http_resource(http_method _method, const std::string&amp; path)</a>
 <a name="26"><span class="lineNum">      26 </span>            :                         : _method(_method), _ver_major(1), _ver_minor(1) { set_path(path); }</a>
 <a name="27"><span class="lineNum">      27 </span>            : </a>
@@ -105,53 +105,60 @@
 <a name="43"><span class="lineNum">      43 </span>            :                  */</a>
 <a name="44"><span class="lineNum">      44 </span>            :                 bool stringify(std::string&amp; out_string, bool with_crlf = true) const;</a>
 <a name="45"><span class="lineNum">      45 </span>            : </a>
-<a name="46"><span class="lineNum">      46 </span>            :         public:</a>
-<a name="47"><span class="lineNum">      47 </span>            :                 /* get protocol version. */</a>
-<a name="48"><span class="lineNum">      48 </span>            :                 inline int32_t get_major_ver() const { return _ver_major; }</a>
-<a name="49"><span class="lineNum">      49 </span>            :                 inline int32_t get_minor_ver() const { return _ver_minor; }</a>
-<a name="50"><span class="lineNum">      50 </span>            : </a>
-<a name="51"><span class="lineNum">      51 </span>            :                 /* get method and path, query string. */</a>
-<a name="52"><span class="lineNum">      52 </span><span class="lineCov">        511 :                 inline const http_method&amp; get_method() const { return _method; }</span></a>
-<a name="53"><span class="lineNum">      53 </span><span class="lineCov">        926 :                 inline const std::string&amp; get_path() const { return _path; }</span></a>
-<a name="54"><span class="lineNum">      54 </span><span class="lineCov">        196 :                 inline const std::string&amp; get_query_string() const { return _query_string; }</span></a>
-<a name="55"><span class="lineNum">      55 </span>            : </a>
-<a name="56"><span class="lineNum">      56 </span>            :                 /* get encoded path string. */</a>
-<a name="57"><span class="lineNum">      57 </span>            :                 inline std::string get_encoded_path() const { return urlencode(_path); }</a>
-<a name="58"><span class="lineNum">      58 </span>            :                 inline const std::string&amp; get_encoded_full_path() const { return _full_path; }</a>
-<a name="59"><span class="lineNum">      59 </span>            : </a>
-<a name="60"><span class="lineNum">      60 </span>            :         public:</a>
-<a name="61"><span class="lineNum">      61 </span>            :                 /* set protocol version. */</a>
-<a name="62"><span class="lineNum">      62 </span><span class="lineCov">        196 :                 inline void set_major_ver(int32_t v) { _ver_major = v; }</span></a>
-<a name="63"><span class="lineNum">      63 </span><span class="lineCov">        196 :                 inline void set_minor_ver(int32_t v) { _ver_minor = v; }</span></a>
-<a name="64"><span class="lineNum">      64 </span>            : </a>
-<a name="65"><span class="lineNum">      65 </span>            :                 /* set method and path string. */</a>
-<a name="66"><span class="lineNum">      66 </span><span class="lineCov">        196 :                 inline void set_method(const http_method&amp; _method) { this-&gt;_method = _method; }</span></a>
-<a name="67"><span class="lineNum">      67 </span><span class="lineCov">        392 :                 inline void set_path(const std::string&amp; path) {</span></a>
-<a name="68"><span class="lineNum">      68 </span><span class="lineCov">        392 :                         size_t s = path.find_first_of('?');</span></a>
-<a name="69"><span class="lineNum">      69 </span><span class="lineCov">        392 :                         _full_path = path;</span></a>
-<a name="70"><span class="lineNum">      70 </span>            : </a>
-<a name="71"><span class="lineNum">      71 </span><span class="lineCov">        392 :                         if (s != std::string::npos) {</span></a>
-<a name="72"><span class="lineNum">      72 </span><span class="lineCov">        130 :                                 _query_string = path.substr(s + 1);</span></a>
-<a name="73"><span class="lineNum">      73 </span><span class="lineCov">        130 :                                 _path = urldecode(path.substr(0, s));</span></a>
-<a name="74"><span class="lineNum">      74 </span>            :                         }</a>
-<a name="75"><span class="lineNum">      75 </span>            : </a>
-<a name="76"><span class="lineNum">      76 </span><span class="lineCov">        262 :                         else _path = urldecode(path);</span></a>
-<a name="77"><span class="lineNum">      77 </span><span class="lineCov">        392 :                 }</span></a>
-<a name="78"><span class="lineNum">      78 </span>            : </a>
-<a name="79"><span class="lineNum">      79 </span>            :                 /* set query string. */</a>
-<a name="80"><span class="lineNum">      80 </span>            :                 inline void set_query_string(const std::string&amp; query_string) {</a>
-<a name="81"><span class="lineNum">      81 </span>            :                         if ((_query_string = query_string).size()) {</a>
-<a name="82"><span class="lineNum">      82 </span>            :                                 _query_string.erase(_query_string.begin(),</a>
-<a name="83"><span class="lineNum">      83 </span>            :                                         std::find_if(_query_string.begin(), _query_string.end(),</a>
-<a name="84"><span class="lineNum">      84 </span>            :                                                 [](unsigned char ch) { return ch != '?'; }));</a>
+<a name="46"><span class="lineNum">      46 </span><span class="lineCov">          2 :                 inline std::string stringify(bool with_crlf = true) const {</span></a>
+<a name="47"><span class="lineNum">      47 </span><span class="lineCov">          2 :                         std::string tmp;</span></a>
+<a name="48"><span class="lineNum">      48 </span>            : </a>
+<a name="49"><span class="lineNum">      49 </span><span class="lineCov">          2 :                         stringify(tmp, with_crlf);</span></a>
+<a name="50"><span class="lineNum">      50 </span><span class="lineCov">          2 :                         return tmp;</span></a>
+<a name="51"><span class="lineNum">      51 </span>            :                 }</a>
+<a name="52"><span class="lineNum">      52 </span>            : </a>
+<a name="53"><span class="lineNum">      53 </span>            :         public:</a>
+<a name="54"><span class="lineNum">      54 </span>            :                 /* get protocol version. */</a>
+<a name="55"><span class="lineNum">      55 </span><span class="lineCov">          2 :                 inline int32_t get_major_ver() const { return _ver_major; }</span></a>
+<a name="56"><span class="lineNum">      56 </span><span class="lineCov">          2 :                 inline int32_t get_minor_ver() const { return _ver_minor; }</span></a>
+<a name="57"><span class="lineNum">      57 </span>            : </a>
+<a name="58"><span class="lineNum">      58 </span>            :                 /* get method and path, query string. */</a>
+<a name="59"><span class="lineNum">      59 </span><span class="lineCov">        200 :                 inline const http_method&amp; get_method() const { return _method; }</span></a>
+<a name="60"><span class="lineNum">      60 </span><span class="lineCov">        464 :                 inline const std::string&amp; get_path() const { return _path; }</span></a>
+<a name="61"><span class="lineNum">      61 </span><span class="lineCov">         82 :                 inline const std::string&amp; get_query_string() const { return _query_string; }</span></a>
+<a name="62"><span class="lineNum">      62 </span>            : </a>
+<a name="63"><span class="lineNum">      63 </span>            :                 /* get encoded path string. */</a>
+<a name="64"><span class="lineNum">      64 </span>            :                 inline std::string get_encoded_path() const { return urlencode(_path); }</a>
+<a name="65"><span class="lineNum">      65 </span>            :                 inline const std::string&amp; get_encoded_full_path() const { return _full_path; }</a>
+<a name="66"><span class="lineNum">      66 </span>            : </a>
+<a name="67"><span class="lineNum">      67 </span>            :         public:</a>
+<a name="68"><span class="lineNum">      68 </span>            :                 /* set protocol version. */</a>
+<a name="69"><span class="lineNum">      69 </span><span class="lineCov">         84 :                 inline void set_major_ver(int32_t v) { _ver_major = v; }</span></a>
+<a name="70"><span class="lineNum">      70 </span><span class="lineCov">         84 :                 inline void set_minor_ver(int32_t v) { _ver_minor = v; }</span></a>
+<a name="71"><span class="lineNum">      71 </span>            : </a>
+<a name="72"><span class="lineNum">      72 </span>            :                 /* set method and path string. */</a>
+<a name="73"><span class="lineNum">      73 </span><span class="lineCov">         84 :                 inline void set_method(const http_method&amp; _method) { this-&gt;_method = _method; }</span></a>
+<a name="74"><span class="lineNum">      74 </span><span class="lineCov">        248 :                 inline void set_path(const std::string&amp; path) {</span></a>
+<a name="75"><span class="lineNum">      75 </span><span class="lineCov">        248 :                         size_t s = path.find_first_of('?');</span></a>
+<a name="76"><span class="lineNum">      76 </span><span class="lineCov">        248 :                         _full_path = path;</span></a>
+<a name="77"><span class="lineNum">      77 </span>            : </a>
+<a name="78"><span class="lineNum">      78 </span><span class="lineCov">        248 :                         if (s != std::string::npos) {</span></a>
+<a name="79"><span class="lineNum">      79 </span><span class="lineCov">         60 :                                 _query_string = path.substr(s + 1);</span></a>
+<a name="80"><span class="lineNum">      80 </span><span class="lineCov">         60 :                                 _path = urldecode(path.substr(0, s));</span></a>
+<a name="81"><span class="lineNum">      81 </span>            :                         }</a>
+<a name="82"><span class="lineNum">      82 </span>            : </a>
+<a name="83"><span class="lineNum">      83 </span><span class="lineCov">        188 :                         else _path = urldecode(path);</span></a>
+<a name="84"><span class="lineNum">      84 </span><span class="lineCov">        248 :                 }</span></a>
 <a name="85"><span class="lineNum">      85 </span>            : </a>
-<a name="86"><span class="lineNum">      86 </span>            :                                 (_full_path = _path).push_back('?');</a>
-<a name="87"><span class="lineNum">      87 </span>            :                                 _full_path.append(_query_string);</a>
-<a name="88"><span class="lineNum">      88 </span>            :                         }</a>
-<a name="89"><span class="lineNum">      89 </span>            :                 }</a>
-<a name="90"><span class="lineNum">      90 </span>            : </a>
-<a name="91"><span class="lineNum">      91 </span>            :         };</a>
-<a name="92"><span class="lineNum">      92 </span>            : }</a>
+<a name="86"><span class="lineNum">      86 </span>            :                 /* set query string. */</a>
+<a name="87"><span class="lineNum">      87 </span>            :                 inline void set_query_string(const std::string&amp; query_string) {</a>
+<a name="88"><span class="lineNum">      88 </span>            :                         if ((_query_string = query_string).size()) {</a>
+<a name="89"><span class="lineNum">      89 </span>            :                                 _query_string.erase(_query_string.begin(),</a>
+<a name="90"><span class="lineNum">      90 </span>            :                                         std::find_if(_query_string.begin(), _query_string.end(),</a>
+<a name="91"><span class="lineNum">      91 </span>            :                                                 [](unsigned char ch) { return ch != '?'; }));</a>
+<a name="92"><span class="lineNum">      92 </span>            : </a>
+<a name="93"><span class="lineNum">      93 </span>            :                                 (_full_path = _path).push_back('?');</a>
+<a name="94"><span class="lineNum">      94 </span>            :                                 _full_path.append(_query_string);</a>
+<a name="95"><span class="lineNum">      95 </span>            :                         }</a>
+<a name="96"><span class="lineNum">      96 </span>            :                 }</a>
+<a name="97"><span class="lineNum">      97 </span>            : </a>
+<a name="98"><span class="lineNum">      98 </span>            :         };</a>
+<a name="99"><span class="lineNum">      99 </span>            : }</a>
 </pre>
       </td>
     </tr>

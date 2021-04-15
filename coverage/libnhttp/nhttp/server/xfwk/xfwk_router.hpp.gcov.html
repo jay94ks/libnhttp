@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">3</td>
@@ -99,85 +99,82 @@
 <a name="37"><span class="lineNum">      37 </span>            :          * class xfwk_router.</a>
 <a name="38"><span class="lineNum">      38 </span>            :          * xfwk router: route http path to specified xfwk resources.</a>
 <a name="39"><span class="lineNum">      39 </span>            :          */</a>
-<a name="40"><span class="lineNum">      40 </span>            :         class NHTTP_API xfwk_router </a>
-<a name="41"><span class="lineNum">      41 </span>            :                 : public http_vpath, </a>
-<a name="42"><span class="lineNum">      42 </span>            :                   public xfwk_facade</a>
-<a name="43"><span class="lineNum">      43 </span>            :         {</a>
-<a name="44"><span class="lineNum">      44 </span>            :         private:</a>
-<a name="45"><span class="lineNum">      45 </span>            :                 std::shared_ptr&lt;xfwk_route&gt; root_route;</a>
-<a name="46"><span class="lineNum">      46 </span>            :                 std::shared_ptr&lt;xfwk_middleware_stack&gt; middlewares;</a>
-<a name="47"><span class="lineNum">      47 </span>            :                 </a>
-<a name="48"><span class="lineNum">      48 </span>            :         public:</a>
-<a name="49"><span class="lineNum">      49 </span>            :                 xfwk_router();</a>
-<a name="50"><span class="lineNum">      50 </span>            :                 xfwk_router(std::string path);</a>
-<a name="51"><span class="lineNum">      51 </span><span class="lineNoCov">          0 :                 xfwk_router(std::shared_ptr&lt;xfwk_route&gt; route) : root_route(route) { }</span></a>
-<a name="52"><span class="lineNum">      52 </span><span class="lineNoCov">          0 :                 xfwk_router(std::string path, std::shared_ptr&lt;xfwk_route&gt; route)</span></a>
-<a name="53"><span class="lineNum">      53 </span><span class="lineNoCov">          0 :                         : http_vpath(std::move(path)), root_route(route)</span></a>
-<a name="54"><span class="lineNum">      54 </span>            :                 {</a>
-<a name="55"><span class="lineNum">      55 </span><span class="lineNoCov">          0 :                 }</span></a>
-<a name="56"><span class="lineNum">      56 </span>            : </a>
-<a name="57"><span class="lineNum">      57 </span><span class="lineCov">          2 :                 virtual ~xfwk_router() { }</span></a>
-<a name="58"><span class="lineNum">      58 </span>            : </a>
-<a name="59"><span class="lineNum">      59 </span>            :         public:</a>
-<a name="60"><span class="lineNum">      60 </span>            :                 /* get root route. */</a>
-<a name="61"><span class="lineNum">      61 </span><span class="lineCov">          4 :                 virtual std::shared_ptr&lt;xfwk_route&gt; get_route() const override { return root_route; }</span></a>
-<a name="62"><span class="lineNum">      62 </span>            : </a>
-<a name="63"><span class="lineNum">      63 </span>            :         public:</a>
-<a name="64"><span class="lineNum">      64 </span>            :                 /**</a>
-<a name="65"><span class="lineNum">      65 </span>            :                  * -- xfwk_facade_middlewares interface --</a>
-<a name="66"><span class="lineNum">      66 </span>            :                  * get or set middleware stack. @warn: DO NOT set under routing process!</a>
-<a name="67"><span class="lineNum">      67 </span>            :                  */</a>
-<a name="68"><span class="lineNum">      68 </span><span class="lineNoCov">          0 :                 virtual std::shared_ptr&lt;xfwk_middleware_stack&gt; get_middlewares() const override { return middlewares; }</span></a>
-<a name="69"><span class="lineNum">      69 </span><span class="lineNoCov">          0 :                 virtual void set_middlewares(const std::shared_ptr&lt;xfwk_middleware_stack&gt;&amp; middlewares) override { this-&gt;middlewares = middlewares; }</span></a>
-<a name="70"><span class="lineNum">      70 </span>            : </a>
-<a name="71"><span class="lineNum">      71 </span>            :         protected:</a>
-<a name="72"><span class="lineNum">      72 </span>            :                 /* add router tag and remove router tag. */</a>
-<a name="73"><span class="lineNum">      73 </span>            :                 virtual bool on_enter(std::shared_ptr&lt;http_context&gt; context) override;</a>
-<a name="74"><span class="lineNum">      74 </span>            :                 virtual void on_leave(std::shared_ptr&lt;http_context&gt; context) override;</a>
-<a name="75"><span class="lineNum">      75 </span>            : </a>
-<a name="76"><span class="lineNum">      76 </span>            :         protected:</a>
-<a name="77"><span class="lineNum">      77 </span>            :                 /* get xfwk_path as reference. */</a>
-<a name="78"><span class="lineNum">      78 </span><span class="lineCov">        199 :                 inline xfwk_path&amp; link_xpath_of(const std::shared_ptr&lt;http_context&gt;&amp; context) {</span></a>
-<a name="79"><span class="lineNum">      79 </span><span class="lineCov">        199 :                         xfwk_router_link_tag* tag = context-&gt;link-&gt;get_tag_ptr&lt;xfwk_router_link_tag&gt;();</span></a>
-<a name="80"><span class="lineNum">      80 </span>            : </a>
-<a name="81"><span class="lineNum">      81 </span>            :                         NHTTP_RANGE_ASSERT(</a>
-<a name="82"><span class="lineNum">      82 </span>            :                                 tag &amp;&amp; tag-&gt;xpaths.size(),</a>
-<a name="83"><span class="lineNum">      83 </span>            :                                 &quot;are you sure the scope is inside of xfwk_router?&quot;</a>
-<a name="84"><span class="lineNum">      84 </span>            :                         );</a>
+<a name="40"><span class="lineNum">      40 </span>            :         class NHTTP_API xfwk_router : public http_vpath, public xfwk_facade {</a>
+<a name="41"><span class="lineNum">      41 </span>            :         private:</a>
+<a name="42"><span class="lineNum">      42 </span>            :                 std::shared_ptr&lt;xfwk_route&gt; root_route;</a>
+<a name="43"><span class="lineNum">      43 </span>            :                 std::shared_ptr&lt;xfwk_middleware_stack&gt; middlewares;</a>
+<a name="44"><span class="lineNum">      44 </span>            :                 </a>
+<a name="45"><span class="lineNum">      45 </span>            :         public:</a>
+<a name="46"><span class="lineNum">      46 </span>            :                 xfwk_router();</a>
+<a name="47"><span class="lineNum">      47 </span>            :                 xfwk_router(std::string path);</a>
+<a name="48"><span class="lineNum">      48 </span><span class="lineNoCov">          0 :                 xfwk_router(std::shared_ptr&lt;xfwk_route&gt; route) : root_route(route) { }</span></a>
+<a name="49"><span class="lineNum">      49 </span><span class="lineNoCov">          0 :                 xfwk_router(std::string path, std::shared_ptr&lt;xfwk_route&gt; route)</span></a>
+<a name="50"><span class="lineNum">      50 </span><span class="lineNoCov">          0 :                         : http_vpath(std::move(path)), root_route(route)</span></a>
+<a name="51"><span class="lineNum">      51 </span>            :                 {</a>
+<a name="52"><span class="lineNum">      52 </span><span class="lineNoCov">          0 :                 }</span></a>
+<a name="53"><span class="lineNum">      53 </span>            : </a>
+<a name="54"><span class="lineNum">      54 </span><span class="lineCov">          2 :                 virtual ~xfwk_router() { }</span></a>
+<a name="55"><span class="lineNum">      55 </span>            : </a>
+<a name="56"><span class="lineNum">      56 </span>            :         public:</a>
+<a name="57"><span class="lineNum">      57 </span>            :                 /* get root route. */</a>
+<a name="58"><span class="lineNum">      58 </span><span class="lineCov">          6 :                 virtual std::shared_ptr&lt;xfwk_route&gt; get_route() const override { return root_route; }</span></a>
+<a name="59"><span class="lineNum">      59 </span>            : </a>
+<a name="60"><span class="lineNum">      60 </span>            :         public:</a>
+<a name="61"><span class="lineNum">      61 </span>            :                 /**</a>
+<a name="62"><span class="lineNum">      62 </span>            :                  * -- xfwk_facade_middlewares interface --</a>
+<a name="63"><span class="lineNum">      63 </span>            :                  * get or set middleware stack. @warn: DO NOT set under routing process!</a>
+<a name="64"><span class="lineNum">      64 </span>            :                  */</a>
+<a name="65"><span class="lineNum">      65 </span><span class="lineNoCov">          0 :                 virtual std::shared_ptr&lt;xfwk_middleware_stack&gt; get_middlewares() const override { return middlewares; }</span></a>
+<a name="66"><span class="lineNum">      66 </span><span class="lineNoCov">          0 :                 virtual void set_middlewares(const std::shared_ptr&lt;xfwk_middleware_stack&gt;&amp; middlewares) override { this-&gt;middlewares = middlewares; }</span></a>
+<a name="67"><span class="lineNum">      67 </span>            : </a>
+<a name="68"><span class="lineNum">      68 </span>            :         protected:</a>
+<a name="69"><span class="lineNum">      69 </span>            :                 /* add router tag and remove router tag. */</a>
+<a name="70"><span class="lineNum">      70 </span>            :                 virtual bool on_enter(std::shared_ptr&lt;http_context&gt; context) override;</a>
+<a name="71"><span class="lineNum">      71 </span>            :                 virtual void on_leave(std::shared_ptr&lt;http_context&gt; context) override;</a>
+<a name="72"><span class="lineNum">      72 </span>            : </a>
+<a name="73"><span class="lineNum">      73 </span>            :         protected:</a>
+<a name="74"><span class="lineNum">      74 </span>            :                 /* get xfwk_path as reference. */</a>
+<a name="75"><span class="lineNum">      75 </span><span class="lineCov">         82 :                 inline xfwk_path&amp; link_xpath_of(const std::shared_ptr&lt;http_context&gt;&amp; context) {</span></a>
+<a name="76"><span class="lineNum">      76 </span><span class="lineCov">         82 :                         xfwk_router_link_tag* tag = context-&gt;link-&gt;get_tag_ptr&lt;xfwk_router_link_tag&gt;();</span></a>
+<a name="77"><span class="lineNum">      77 </span>            : </a>
+<a name="78"><span class="lineNum">      78 </span>            :                         NHTTP_RANGE_ASSERT(</a>
+<a name="79"><span class="lineNum">      79 </span>            :                                 tag &amp;&amp; tag-&gt;xpaths.size(),</a>
+<a name="80"><span class="lineNum">      80 </span>            :                                 &quot;are you sure the scope is inside of xfwk_router?&quot;</a>
+<a name="81"><span class="lineNum">      81 </span>            :                         );</a>
+<a name="82"><span class="lineNum">      82 </span>            : </a>
+<a name="83"><span class="lineNum">      83 </span><span class="lineCov">         82 :                         return tag-&gt;xpaths.top();</span></a>
+<a name="84"><span class="lineNum">      84 </span>            :                 }</a>
 <a name="85"><span class="lineNum">      85 </span>            : </a>
-<a name="86"><span class="lineNum">      86 </span><span class="lineCov">        199 :                         return tag-&gt;xpaths.top();</span></a>
-<a name="87"><span class="lineNum">      87 </span>            :                 }</a>
-<a name="88"><span class="lineNum">      88 </span>            : </a>
-<a name="89"><span class="lineNum">      89 </span>            :         protected:</a>
-<a name="90"><span class="lineNum">      90 </span>            :                 /* handle http request under base path. */</a>
-<a name="91"><span class="lineNum">      91 </span>            :                 virtual bool on_handle(std::shared_ptr&lt;http_context&gt; context, extended_t) override;</a>
-<a name="92"><span class="lineNum">      92 </span>            :         };</a>
-<a name="93"><span class="lineNum">      93 </span>            : </a>
-<a name="94"><span class="lineNum">      94 </span>            :         /* get xpath from request. */</a>
-<a name="95"><span class="lineNum">      95 </span>            :         inline xfwk_path&amp; xpath_of(std::shared_ptr&lt;http_request&gt; request) {</a>
-<a name="96"><span class="lineNum">      96 </span>            :                 NHTTP_DEBUG(</a>
-<a name="97"><span class="lineNum">      97 </span>            :                         auto* tag = request-&gt;get_tag_ptr&lt;xfwk_router_request_tag&gt;();</a>
-<a name="98"><span class="lineNum">      98 </span>            : </a>
-<a name="99"><span class="lineNum">      99 </span>            :                         NHTTP_ENSURE(tag,</a>
-<a name="100"><span class="lineNum">     100 </span>            :                                 &quot;are you sure the scope is inside of xfwk_router?&quot;</a>
-<a name="101"><span class="lineNum">     101 </span>            :                         );</a>
-<a name="102"><span class="lineNum">     102 </span>            : </a>
-<a name="103"><span class="lineNum">     103 </span>            :                         if (!tag) {</a>
-<a name="104"><span class="lineNum">     104 </span>            :                                 tag = request-&gt;set_tag&lt;xfwk_router_request_tag&gt;();</a>
-<a name="105"><span class="lineNum">     105 </span>            :                         }</a>
+<a name="86"><span class="lineNum">      86 </span>            :         protected:</a>
+<a name="87"><span class="lineNum">      87 </span>            :                 /* handle http request under base path. */</a>
+<a name="88"><span class="lineNum">      88 </span>            :                 virtual bool on_handle(std::shared_ptr&lt;http_context&gt; context, extended_t) override;</a>
+<a name="89"><span class="lineNum">      89 </span>            :         };</a>
+<a name="90"><span class="lineNum">      90 </span>            : </a>
+<a name="91"><span class="lineNum">      91 </span>            :         /* get xpath from request. */</a>
+<a name="92"><span class="lineNum">      92 </span>            :         inline xfwk_path&amp; xpath_of(std::shared_ptr&lt;http_request&gt; request) {</a>
+<a name="93"><span class="lineNum">      93 </span>            :                 NHTTP_DEBUG(</a>
+<a name="94"><span class="lineNum">      94 </span>            :                         auto* tag = request-&gt;get_tag_ptr&lt;xfwk_router_request_tag&gt;();</a>
+<a name="95"><span class="lineNum">      95 </span>            : </a>
+<a name="96"><span class="lineNum">      96 </span>            :                         NHTTP_ENSURE(tag,</a>
+<a name="97"><span class="lineNum">      97 </span>            :                                 &quot;are you sure the scope is inside of xfwk_router?&quot;</a>
+<a name="98"><span class="lineNum">      98 </span>            :                         );</a>
+<a name="99"><span class="lineNum">      99 </span>            : </a>
+<a name="100"><span class="lineNum">     100 </span>            :                         if (!tag) {</a>
+<a name="101"><span class="lineNum">     101 </span>            :                                 tag = request-&gt;set_tag&lt;xfwk_router_request_tag&gt;();</a>
+<a name="102"><span class="lineNum">     102 </span>            :                         }</a>
+<a name="103"><span class="lineNum">     103 </span>            : </a>
+<a name="104"><span class="lineNum">     104 </span>            :                         return tag-&gt;xpath;</a>
+<a name="105"><span class="lineNum">     105 </span>            :                 );</a>
 <a name="106"><span class="lineNum">     106 </span>            : </a>
-<a name="107"><span class="lineNum">     107 </span>            :                         return tag-&gt;xpath;</a>
-<a name="108"><span class="lineNum">     108 </span>            :                 );</a>
-<a name="109"><span class="lineNum">     109 </span>            : </a>
-<a name="110"><span class="lineNum">     110 </span>            :                 /* on release binary, this will not test the tag is valid or not. */</a>
-<a name="111"><span class="lineNum">     111 </span>            :                 NHTTP_RELEASE(</a>
-<a name="112"><span class="lineNum">     112 </span>            :                         return request-&gt;get_tag_ptr&lt;xfwk_router_request_tag&gt;()-&gt;xpath;</a>
-<a name="113"><span class="lineNum">     113 </span>            :                 );</a>
-<a name="114"><span class="lineNum">     114 </span>            :         }</a>
-<a name="115"><span class="lineNum">     115 </span>            : </a>
-<a name="116"><span class="lineNum">     116 </span>            : }</a>
-<a name="117"><span class="lineNum">     117 </span>            : }</a>
-<a name="118"><span class="lineNum">     118 </span>            : }</a>
+<a name="107"><span class="lineNum">     107 </span>            :                 /* on release binary, this will not test the tag is valid or not. */</a>
+<a name="108"><span class="lineNum">     108 </span>            :                 NHTTP_RELEASE(</a>
+<a name="109"><span class="lineNum">     109 </span>            :                         return request-&gt;get_tag_ptr&lt;xfwk_router_request_tag&gt;()-&gt;xpath;</a>
+<a name="110"><span class="lineNum">     110 </span>            :                 );</a>
+<a name="111"><span class="lineNum">     111 </span>            :         }</a>
+<a name="112"><span class="lineNum">     112 </span>            : </a>
+<a name="113"><span class="lineNum">     113 </span>            : }</a>
+<a name="114"><span class="lineNum">     114 </span>            : }</a>
+<a name="115"><span class="lineNum">     115 </span>            : }</a>
 </pre>
       </td>
     </tr>

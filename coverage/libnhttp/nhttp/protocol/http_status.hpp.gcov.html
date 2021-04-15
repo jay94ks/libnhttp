@@ -31,18 +31,18 @@
             <td class="headerValue">coverage.info</td>
             <td></td>
             <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntry">8</td>
             <td class="headerCovTableEntry">16</td>
-            <td class="headerCovTableEntryLo">37.5 %</td>
+            <td class="headerCovTableEntryLo">50.0 %</td>
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
-            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">5</td>
             <td class="headerCovTableEntry">6</td>
-            <td class="headerCovTableEntryLo">50.0 %</td>
+            <td class="headerCovTableEntryMed">83.3 %</td>
           </tr>
           <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
         </table>
@@ -171,9 +171,9 @@
 <a name="109"><span class="lineNum">     109 </span>            :                 static void set_default_phrase(http_status&amp; status, int16_t code);</a>
 <a name="110"><span class="lineNum">     110 </span>            : </a>
 <a name="111"><span class="lineNum">     111 </span>            :         public:</a>
-<a name="112"><span class="lineNum">     112 </span><span class="lineCov">        703 :                 http_status() : code(200), _ver_major(1), _ver_minor(1) { set_default_phrase(*this, 200); }</span></a>
+<a name="112"><span class="lineNum">     112 </span><span class="lineCov">        280 :                 http_status() : code(200), _ver_major(1), _ver_minor(1) { set_default_phrase(*this, 200); }</span></a>
 <a name="113"><span class="lineNum">     113 </span>            :                 http_status(const pseudo_t&amp; p) : code(p._), _ver_major(1), _ver_minor(1) { }</a>
-<a name="114"><span class="lineNum">     114 </span>            :                 http_status(const well_known_t&amp; w) : code(w._1), phrase(w._2, w._len), _ver_major(1), _ver_minor(1) { }</a>
+<a name="114"><span class="lineNum">     114 </span><span class="lineCov">          2 :                 http_status(const well_known_t&amp; w) : code(w._1), phrase(w._2, w._len), _ver_major(1), _ver_minor(1) { }</span></a>
 <a name="115"><span class="lineNum">     115 </span><span class="lineNoCov">          0 :                 http_status(int16_t code, const char* phrase = nullptr)</span></a>
 <a name="116"><span class="lineNum">     116 </span><span class="lineNoCov">          0 :                         : code(code), _ver_major(1), _ver_minor(1)</span></a>
 <a name="117"><span class="lineNum">     117 </span>            :                 {</a>
@@ -212,28 +212,28 @@
 <a name="150"><span class="lineNum">     150 </span>            :                 inline bool operator !=(const well_known_t&amp; o) const { return code != o._1; }</a>
 <a name="151"><span class="lineNum">     151 </span>            : </a>
 <a name="152"><span class="lineNum">     152 </span>            :         public:</a>
-<a name="153"><span class="lineNum">     153 </span><span class="lineCov">        192 :                 inline int16_t get_code() const { return code; }</span></a>
+<a name="153"><span class="lineNum">     153 </span>            :                 inline int16_t get_code() const { return code; }</a>
 <a name="154"><span class="lineNum">     154 </span>            :                 inline const std::string&amp; get_phrase() const { return phrase; }</a>
 <a name="155"><span class="lineNum">     155 </span>            : </a>
 <a name="156"><span class="lineNum">     156 </span>            :                 inline int8_t get_major_ver() const { return _ver_major; }</a>
 <a name="157"><span class="lineNum">     157 </span>            :                 inline int8_t get_minor_ver() const { return _ver_minor; }</a>
 <a name="158"><span class="lineNum">     158 </span>            : </a>
-<a name="159"><span class="lineNum">     159 </span><span class="lineNoCov">          0 :                 inline void set_major_ver(int8_t v) { _ver_major = v; }</span></a>
-<a name="160"><span class="lineNum">     160 </span><span class="lineNoCov">          0 :                 inline void set_minor_ver(int8_t v) { _ver_minor = v; }</span></a>
+<a name="159"><span class="lineNum">     159 </span><span class="lineCov">          2 :                 inline void set_major_ver(int8_t v) { _ver_major = v; }</span></a>
+<a name="160"><span class="lineNum">     160 </span><span class="lineCov">          2 :                 inline void set_minor_ver(int8_t v) { _ver_minor = v; }</span></a>
 <a name="161"><span class="lineNum">     161 </span>            : </a>
 <a name="162"><span class="lineNum">     162 </span>            :                 inline bool is_succeed() const { return code &gt;= 200 &amp;&amp; code &lt; 300; }</a>
 <a name="163"><span class="lineNum">     163 </span>            :                 inline bool is_failed() const { return !is_succeed(); }</a>
 <a name="164"><span class="lineNum">     164 </span>            : </a>
 <a name="165"><span class="lineNum">     165 </span>            :                 /* set status code and its phrase. */</a>
-<a name="166"><span class="lineNum">     166 </span><span class="lineCov">        385 :                 inline void set(int32_t code, const char* phrase = nullptr) {</span></a>
-<a name="167"><span class="lineNum">     167 </span><span class="lineCov">        385 :                         if (!phrase)</span></a>
-<a name="168"><span class="lineNum">     168 </span><span class="lineCov">        385 :                                 set_default_phrase(*this, this-&gt;code = code);</span></a>
+<a name="166"><span class="lineNum">     166 </span><span class="lineCov">        150 :                 inline void set(int32_t code, const char* phrase = nullptr) {</span></a>
+<a name="167"><span class="lineNum">     167 </span><span class="lineCov">        150 :                         if (!phrase)</span></a>
+<a name="168"><span class="lineNum">     168 </span><span class="lineCov">        150 :                                 set_default_phrase(*this, this-&gt;code = code);</span></a>
 <a name="169"><span class="lineNum">     169 </span>            : </a>
 <a name="170"><span class="lineNum">     170 </span>            :                         else {</a>
 <a name="171"><span class="lineNum">     171 </span><span class="lineNoCov">          0 :                                 this-&gt;code = code;</span></a>
 <a name="172"><span class="lineNum">     172 </span><span class="lineNoCov">          0 :                                 this-&gt;phrase = phrase;</span></a>
 <a name="173"><span class="lineNum">     173 </span>            :                         }</a>
-<a name="174"><span class="lineNum">     174 </span><span class="lineCov">        385 :                 }</span></a>
+<a name="174"><span class="lineNum">     174 </span><span class="lineCov">        150 :                 }</span></a>
 <a name="175"><span class="lineNum">     175 </span>            :         };</a>
 <a name="176"><span class="lineNum">     176 </span>            : </a>
 <a name="177"><span class="lineNum">     177 </span>            : }</a>

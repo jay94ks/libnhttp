@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">10</td>
@@ -147,16 +147,16 @@
 <a name="85"><span class="lineNum">      85 </span>            :                 std::string value;</a>
 <a name="86"><span class="lineNum">      86 </span>            : </a>
 <a name="87"><span class="lineNum">      87 </span>            :         public:</a>
-<a name="88"><span class="lineNum">      88 </span><span class="lineCov">        976 :                 http_header() { }</span></a>
-<a name="89"><span class="lineNum">      89 </span><span class="lineCov">        964 :                 http_header(const well_known_t&amp; v) : name(v._1, v._len) { }</span></a>
+<a name="88"><span class="lineNum">      88 </span><span class="lineCov">        372 :                 http_header() { }</span></a>
+<a name="89"><span class="lineNum">      89 </span><span class="lineCov">        282 :                 http_header(const well_known_t&amp; v) : name(v._1, v._len) { }</span></a>
 <a name="90"><span class="lineNum">      90 </span>            :                 http_header(const std::string&amp; name, const std::string&amp; value)</a>
 <a name="91"><span class="lineNum">      91 </span>            :                         : name(name), value(value) { qualify(); }</a>
 <a name="92"><span class="lineNum">      92 </span>            : </a>
-<a name="93"><span class="lineNum">      93 </span><span class="lineCov">       2328 :                 http_header(const http_header&amp; h) : name(h.name), value(h.value) { }</span></a>
-<a name="94"><span class="lineNum">      94 </span><span class="lineCov">       2705 :                 http_header(http_header&amp;&amp; h) : name(std::move(h.name)), value(std::move(h.value)) { }</span></a>
+<a name="93"><span class="lineNum">      93 </span><span class="lineCov">        742 :                 http_header(const http_header&amp; h) : name(h.name), value(h.value) { }</span></a>
+<a name="94"><span class="lineNum">      94 </span><span class="lineCov">        850 :                 http_header(http_header&amp;&amp; h) : name(std::move(h.name)), value(std::move(h.value)) { }</span></a>
 <a name="95"><span class="lineNum">      95 </span>            : </a>
 <a name="96"><span class="lineNum">      96 </span>            :                 inline http_header&amp; operator =(const http_header&amp; o) { name = o.name; value = o.value; return *this; }</a>
-<a name="97"><span class="lineNum">      97 </span><span class="lineCov">       1810 :                 inline http_header&amp; operator =(http_header&amp;&amp; o) { name = std::move(o.name); value = std::move(o.value); return *this; }</span></a>
+<a name="97"><span class="lineNum">      97 </span><span class="lineCov">        412 :                 inline http_header&amp; operator =(http_header&amp;&amp; o) { name = std::move(o.name); value = std::move(o.value); return *this; }</span></a>
 <a name="98"><span class="lineNum">      98 </span>            : </a>
 <a name="99"><span class="lineNum">      99 </span>            :         public:</a>
 <a name="100"><span class="lineNum">     100 </span>            :                 inline operator bool() const { return name.size(); }</a>
@@ -165,7 +165,7 @@
 <a name="103"><span class="lineNum">     103 </span>            :                 inline bool operator ==(const http_header&amp; m) const { return name.size() == m.name.size() &amp;&amp; name == m.name &amp;&amp; value.size() == m.value.size() &amp;&amp; value == m.value; }</a>
 <a name="104"><span class="lineNum">     104 </span>            :                 inline bool operator !=(const http_header&amp; m) const { return name.size() != m.name.size() || name != m.name || value.size() != m.value.size() || value != m.value; }</a>
 <a name="105"><span class="lineNum">     105 </span>            : </a>
-<a name="106"><span class="lineNum">     106 </span><span class="lineCov">       8292 :                 inline bool operator ==(const well_known_t&amp; w) const { return name.size() == w._len &amp;&amp; name == w._1; }</span></a>
+<a name="106"><span class="lineNum">     106 </span><span class="lineCov">       1760 :                 inline bool operator ==(const well_known_t&amp; w) const { return name.size() == w._len &amp;&amp; name == w._1; }</span></a>
 <a name="107"><span class="lineNum">     107 </span>            :                 inline bool operator !=(const well_known_t&amp; w) const { return name.size() != w._len || name != w._1; }</a>
 <a name="108"><span class="lineNum">     108 </span>            : </a>
 <a name="109"><span class="lineNum">     109 </span>            :         public:</a>
@@ -186,11 +186,11 @@
 <a name="124"><span class="lineNum">     124 </span>            :                 bool stringify(std::string&amp; out_string, bool with_crlf = true) const;</a>
 <a name="125"><span class="lineNum">     125 </span>            : </a>
 <a name="126"><span class="lineNum">     126 </span>            :         public:</a>
-<a name="127"><span class="lineNum">     127 </span><span class="lineCov">       4228 :                 inline const std::string&amp; get_name() const  { return name; }</span></a>
-<a name="128"><span class="lineNum">     128 </span><span class="lineCov">        548 :                 inline const std::string&amp; get_value() const { return value; }</span></a>
+<a name="127"><span class="lineNum">     127 </span><span class="lineCov">        724 :                 inline const std::string&amp; get_name() const  { return name; }</span></a>
+<a name="128"><span class="lineNum">     128 </span><span class="lineCov">        212 :                 inline const std::string&amp; get_value() const { return value; }</span></a>
 <a name="129"><span class="lineNum">     129 </span>            : </a>
-<a name="130"><span class="lineNum">     130 </span><span class="lineCov">        976 :                 inline void set_name(const std::string&amp; name) { this-&gt;name = name; }</span></a>
-<a name="131"><span class="lineNum">     131 </span><span class="lineCov">       2120 :                 inline void set_value(const std::string&amp; value) { this-&gt;value = value; }</span></a>
+<a name="130"><span class="lineNum">     130 </span><span class="lineCov">        372 :                 inline void set_name(const std::string&amp; name) { this-&gt;name = name; }</span></a>
+<a name="131"><span class="lineNum">     131 </span><span class="lineCov">        736 :                 inline void set_value(const std::string&amp; value) { this-&gt;value = value; }</span></a>
 <a name="132"><span class="lineNum">     132 </span>            : </a>
 <a name="133"><span class="lineNum">     133 </span>            :         private:</a>
 <a name="134"><span class="lineNum">     134 </span>            :                 /* trim whitespaces. */</a>

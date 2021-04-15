@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-04-14 00:34:07</td>
+            <td class="headerValue">2021-04-15 15:58:40</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">3</td>
@@ -132,9 +132,9 @@
 <a name="70"><span class="lineNum">      70 </span>            :                 static constexpr well_known_t MULTIPART_BYTERANGES              = well_known_t(&quot;multipart&quot;, &quot;byteranges&quot;);</a>
 <a name="71"><span class="lineNum">      71 </span>            : </a>
 <a name="72"><span class="lineNum">      72 </span>            :         public:</a>
-<a name="73"><span class="lineNum">      73 </span><span class="lineCov">         60 :                 http_mime_type() : category(&quot;application&quot;), detail(&quot;octet-stream&quot;) { }</span></a>
-<a name="74"><span class="lineNum">      74 </span><span class="lineCov">        116 :                 http_mime_type(const well_known_t&amp; w) </span></a>
-<a name="75"><span class="lineNum">      75 </span><span class="lineCov">        116 :                         : category(w._1, w._len_1), detail(w._2, w._len_2) { }</span></a>
+<a name="73"><span class="lineNum">      73 </span><span class="lineCov">          6 :                 http_mime_type() { }</span></a>
+<a name="74"><span class="lineNum">      74 </span><span class="lineCov">         18 :                 http_mime_type(const well_known_t&amp; w) </span></a>
+<a name="75"><span class="lineNum">      75 </span><span class="lineCov">         18 :                         : category(w._1, w._len_1), detail(w._2, w._len_2) { }</span></a>
 <a name="76"><span class="lineNum">      76 </span>            : </a>
 <a name="77"><span class="lineNum">      77 </span>            :                 http_mime_type(const char* cat, const char* det)</a>
 <a name="78"><span class="lineNum">      78 </span>            :                         : category(cat), detail(det) { }</a>
@@ -192,10 +192,10 @@
 <a name="130"><span class="lineNum">     130 </span>            :                  */</a>
 <a name="131"><span class="lineNum">     131 </span>            :                 bool stringify(std::string&amp; out_string) const;</a>
 <a name="132"><span class="lineNum">     132 </span>            : </a>
-<a name="133"><span class="lineNum">     133 </span><span class="lineCov">        116 :                 inline std::string stringify() const {</span></a>
-<a name="134"><span class="lineNum">     134 </span><span class="lineCov">        116 :                         std::string ret;</span></a>
-<a name="135"><span class="lineNum">     135 </span><span class="lineCov">        116 :                         stringify(ret);</span></a>
-<a name="136"><span class="lineNum">     136 </span><span class="lineCov">        116 :                         return ret;</span></a>
+<a name="133"><span class="lineNum">     133 </span><span class="lineCov">         20 :                 inline std::string stringify() const {</span></a>
+<a name="134"><span class="lineNum">     134 </span><span class="lineCov">         20 :                         std::string ret;</span></a>
+<a name="135"><span class="lineNum">     135 </span><span class="lineCov">         20 :                         stringify(ret);</span></a>
+<a name="136"><span class="lineNum">     136 </span><span class="lineCov">         20 :                         return ret;</span></a>
 <a name="137"><span class="lineNum">     137 </span>            :                 }</a>
 <a name="138"><span class="lineNum">     138 </span>            :         };</a>
 <a name="139"><span class="lineNum">     139 </span>            : </a>
