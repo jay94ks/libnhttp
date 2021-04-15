@@ -70,7 +70,7 @@ namespace _ {
 		static constexpr well_known_t MULTIPART_BYTERANGES		= well_known_t("multipart", "byteranges");
 
 	public:
-		http_mime_type() : category("application"), detail("octet-stream") { }
+		http_mime_type() { }
 		http_mime_type(const well_known_t& w) 
 			: category(w._1, w._len_1), detail(w._2, w._len_2) { }
 

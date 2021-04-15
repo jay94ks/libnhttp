@@ -39,7 +39,7 @@ namespace nhttp {
 		else if (!end) return -1;
 
 		/* recalculate its length: Wed, 1 Mar 2021 00:00:00 GMT (28) */
-		if ((max = size_t(end - src)) < 28) return -1;
+		if ((max = size_t(end - src)) < 28 - 3) return -1;
 
 		/* remove whitespace from end. */
 		while (src < end && (*end == ' ' || *end == '\t')) { --end; }
@@ -47,7 +47,7 @@ namespace nhttp {
 
 		/* remove day in string: begining three characters and comma.  */
 		while (*src != ',' && max) { ++src; --max; }
-		if (!max || src[0] != ',' || src[1] != ' ' || src[1] != '\t')
+		if (!max || src[0] != ',' || (src[1] != ' ' && src[1] != '\t'))
 			return -1; ++src; --max;
 
 		/* remove whitespace from src. */
@@ -106,7 +106,7 @@ namespace nhttp {
 		minutes = (src[3] - '0') * 10 + (src[4] - '0');
 		if (minutes < 0 || minutes >= 60) return -1; // allows 0 ~ 23.
 
-		seconds = (src[3] - '0') * 10 + (src[4] - '0');
+		seconds = (src[6] - '0') * 10 + (src[7] - '0');
 		if (seconds < 0 || seconds >= 60) return -1; // allows 0 ~ 23.
 
 		struct tm _tm = { 0, };

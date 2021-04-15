@@ -39,8 +39,10 @@ clean:
 	rm -rf test-main.cpp
 	
 test-app: $(X_CVG_OBJECTS) $(C_CVG_OBJECTS)
-	cp ../nhttpd/main.cpp test-main.cpp
-	g++ -o test-app test-main.cpp $(X_CVG_OBJECTS) $(C_CVG_OBJECTS) -I. \
+	cp ../libnhttp-tests/main.cpp test-main.cpp
+	cp -R ../libnhttp-tests/tests ./tests
+	g++ -o test-app test-main.cpp $(shell find `pwd`/tests -type f -regex ".*\.cpp") \
+		$(X_CVG_OBJECTS) $(C_CVG_OBJECTS) -I. \
 		-lgcov --coverage -fprofile-arcs -ftest-coverage -std=c++17 -lpthread
 
 run-test-app: test-app

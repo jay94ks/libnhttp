@@ -36,7 +36,7 @@ namespace nhttp {
 
 		/* parsing status code and check its validity. */
 		int16_t code = (sp_1[0] - '0') * 100 + (sp_1[1] - '0') * 10 + (sp_1[2] - '0');
-		if (code >= 100 && code <= 515) return -2;
+		if (code < 100 || code > 515) return -2;
 
 		/* phrase isn't neccessary. */
 		const char* phrase = ++sp_2; // to end.

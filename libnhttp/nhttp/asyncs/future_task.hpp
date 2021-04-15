@@ -71,6 +71,7 @@ namespace _ {
 
 	public:
 		future_task(lambda_type&& lambda)
+			: lambda(std::move(lambda))
 		{
 		}
 

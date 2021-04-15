@@ -43,6 +43,13 @@ namespace nhttp {
 		 */
 		bool stringify(std::string& out_string, bool with_crlf = true) const;
 
+		inline std::string stringify(bool with_crlf = true) const {
+			std::string tmp;
+
+			stringify(tmp, with_crlf);
+			return tmp;
+		}
+
 	public:
 		/* get protocol version. */
 		inline int32_t get_major_ver() const { return _ver_major; }

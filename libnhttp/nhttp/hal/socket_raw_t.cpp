@@ -342,6 +342,28 @@ namespace hal {
         return false;
     }
 
+    bool socket_raw_t::connect(void* data, size_t size) {
+        sockaddr_sr sr = { 0, };
+
+        if (fd != INVALID_SOCKET_FD) {
+            switch (size) {
+                case sizeof(ipv4_addr) :
+                    ipv4_to_sockaddr(*((ipv4_addr*)data), sr);
+                    return check_return(::connect(fd, (sockaddr*)&sr.ipv4_addr, sizeof(sockaddr_in)));
+
+                case sizeof(ipv6_addr) :
+                    ipv6_to_sockaddr(*((ipv6_addr*)data), sr);
+                    return check_return(::connect(fd, (sockaddr*)&sr.ipv6_addr, sizeof(sockaddr_in6)));
+            }
+
+            err = ENOTSUP;
+            return false;
+        }
+
+        err = ENOTSOCK;
+        return false;
+    }
+
     bool socket_raw_t::listen(int32_t backlog) {
         if (fd != INVALID_SOCKET_FD) {
             return check_return(::listen(fd, backlog));
@@ -607,37 +629,37 @@ namespace hal {
         return -1;
     }
 
-    ssize_t socket_raw_t::read_n(void* buf, size_t n) {
-        if (fd != INVALID_SOCKET_FD) {
-            uint8_t* bytes = (uint8_t*)buf;
-            ssize_t retval = 0;
+    //ssize_t socket_raw_t::read_n(void* buf, size_t n) {
+    //    if (fd != INVALID_SOCKET_FD) {
+    //        uint8_t* bytes = (uint8_t*)buf;
+    //        ssize_t retval = 0;
 
-            while (n) {
-                ssize_t block = read(bytes, n);
+    //        while (n) {
+    //            ssize_t block = read(bytes, n);
 
-                if (block < 0) {
-                    if (err == EINTR)
-                        continue;
+    //            if (block < 0) {
+    //                if (err == EINTR)
+    //                    continue;
 
-                    retval = -1;
-                    break;
-                }
+    //                retval = -1;
+    //                break;
+    //            }
 
-                if (!block) {
-                    break;
-                }
+    //            if (!block) {
+    //                break;
+    //            }
 
-                bytes += block;
-                retval += block;
-                n -= block;
-            }
+    //            bytes += block;
+    //            retval += block;
+    //            n -= block;
+    //        }
 
-            return retval;
-        }
+    //        return retval;
+    //    }
 
-        err = ENOTSOCK;
-        return -1;
-    }
+    //    err = ENOTSOCK;
+    //    return -1;
+    //}
 
     ssize_t socket_raw_t::write(const void* buf, size_t n) {
         if (n > 0x7ffffffful) n = 0x7ffffffful;
@@ -655,7 +677,7 @@ namespace hal {
         return -1;
     }
 
-    ssize_t socket_raw_t::write_n(const void* buf, size_t n) {
+    /*ssize_t socket_raw_t::write_n(const void* buf, size_t n) {
         if (fd != INVALID_SOCKET_FD) {
             uint8_t* bytes = (uint8_t*)buf;
             ssize_t retval = 0;
@@ -685,7 +707,7 @@ namespace hal {
 
         err = ENOTSOCK;
         return -1;
-    }
+    }*/
 
     bool socket_raw_t::shutdown(int how) {
         if (fd != INVALID_SOCKET_FD) {

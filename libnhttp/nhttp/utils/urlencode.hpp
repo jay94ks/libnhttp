@@ -10,14 +10,14 @@ namespace nhttp {
 		std::string retval;
 
 		while (src < src_end) {
-			char c = *src;
+			char c = *src++;
 
 			if (c == ' ')
 				retval.push_back('+');
 				
 			else if (
 				(c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-				 c == '@' || c == '/'  ||  c == '.' || c == '-' ||   c == '_' || c == ':' ||
+				 c == '@' || c == '/'  ||  c == '.' || c == '-' ||   c == '_' ||
 				 c == '~' || c == ';'  ||  c == '!')
 			{
 				retval.push_back(c);

@@ -15,6 +15,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Documents", "0. Document
 		ReadMe.md = ReadMe.md
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libnhttp-tests", "libnhttp-tests\libnhttp-tests.vcxproj", "{AF319D88-9C7A-4BE0-B531-EC286472BBB5}"
+	ProjectSection(ProjectDependencies) = postProject
+		{5C48D52A-2BAC-42C8-8EEA-AB47FD83E6C6} = {5C48D52A-2BAC-42C8-8EEA-AB47FD83E6C6}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -39,6 +44,14 @@ Global
 		{5C48D52A-2BAC-42C8-8EEA-AB47FD83E6C6}.Release|x64.Build.0 = Release|x64
 		{5C48D52A-2BAC-42C8-8EEA-AB47FD83E6C6}.Release|x86.ActiveCfg = Release|Win32
 		{5C48D52A-2BAC-42C8-8EEA-AB47FD83E6C6}.Release|x86.Build.0 = Release|Win32
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Debug|x64.ActiveCfg = Debug|x64
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Debug|x64.Build.0 = Debug|x64
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Debug|x86.ActiveCfg = Debug|Win32
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Debug|x86.Build.0 = Debug|Win32
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Release|x64.ActiveCfg = Release|x64
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Release|x64.Build.0 = Release|x64
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Release|x86.ActiveCfg = Release|Win32
+		{AF319D88-9C7A-4BE0-B531-EC286472BBB5}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

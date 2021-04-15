@@ -106,11 +106,17 @@ namespace hal {
 	private:
 		bool check_return(int32_t ret_val) const;
 		bool bind(void* data, size_t size);
+		bool connect(void* data, size_t size);
 
 	public:
 		template<typename address_type>
 		inline bool bind(const address_type& addr) {
 			return bind((void*)&addr, sizeof(address_type));
+		}
+
+		template<typename address_type>
+		inline bool connect(const address_type& addr) {
+			return connect((void*)&addr, sizeof(address_type));
 		}
 
 		bool listen(int32_t backlog);
@@ -150,10 +156,10 @@ namespace hal {
 
 	public:
 		ssize_t read(void* buf, size_t n);
-		ssize_t read_n(void* buf, size_t n);
+		//ssize_t read_n(void* buf, size_t n);
 
 		ssize_t write(const void* buf, size_t n);
-		ssize_t write_n(const void* buf, size_t n);
+		//ssize_t write_n(const void* buf, size_t n);
 
 	public:
 		bool shutdown(int how = SHUT_RDWR);

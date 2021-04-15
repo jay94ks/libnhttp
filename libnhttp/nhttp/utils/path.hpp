@@ -16,8 +16,10 @@ namespace nhttp {
 		
 		++in_e;
 
-		while (in_b < in_e && *in_e != '/')	--in_e;
-		if (*in_e == '/')					--in_e;
+		while (in_b < in_e && *(in_e - 1) != '/')	--in_e;
+		while (in_b < in_e && *(--in_e) == '/');
+
+		++in_e;
 
 		if (in_b < in_e)
 			return std::string(in_b, size_t(in_e - in_b));
@@ -37,7 +39,10 @@ namespace nhttp {
 			if (*in_c != '/')
 			   --in_c;
 
-			else break;
+			else {
+				++in_c;
+				break;
+			}
 		}
 
 		if (in_c < in_e)
@@ -81,14 +86,14 @@ namespace nhttp {
 			}
 
 			/* back to prev: destack. */
-			if (!strncmp(in_b, "..", size_t(sep - in_b))) {
+			if (!strncmp(in_b, "..", 2)) {
 				uses = uses > 0 ? uses - 1 : 0;
 				in_b = sep + 1;
 				continue;
 			}
 
 			/* empty or self: skip. */
-			else if (in_b == sep - 1 || !strncmp(in_b, ".", size_t(sep - in_b))) {
+			else if (!strncmp(in_b, ".", size_t(sep - in_b))) {
 				in_b = sep + 1;
 				continue;
 			}

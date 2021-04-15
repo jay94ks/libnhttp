@@ -91,6 +91,13 @@ namespace nhttp {
 			return handle->raw.bind(ep.addr);
 		}
 
+		/* connect to endpoint. */
+		template<typename endpoint_type>
+		inline bool connect(const endpoint_type& ep) {
+			NHTTP_INIT_ASSERT(handle, "socket isn't initialized!");
+			return handle->raw.connect(ep.addr);
+		}
+
 		/* listen the endpoint with backlog. */
 		inline bool listen(int32_t backlog = 100) {
 			NHTTP_INIT_ASSERT(handle, "socket isn't initialized!");
@@ -163,17 +170,17 @@ namespace nhttp {
 			return handle->raw.write(buf, n);
 		}
 
-		/* read n bytes explicitly, if under non-blocking, this works same with read() fn. */
-		inline ssize_t read_n(void* buf, size_t n) {
-			NHTTP_INIT_ASSERT(handle, "socket isn't initialized!");
-			return handle->raw.read_n(buf, n);
-		}
+		///* read n bytes explicitly, if under non-blocking, this works same with read() fn. */
+		//inline ssize_t read_n(void* buf, size_t n) {
+		//	NHTTP_INIT_ASSERT(handle, "socket isn't initialized!");
+		//	return handle->raw.read_n(buf, n);
+		//}
 
-		/* write n bytes explicitly. if under non-blocking, this works same with read() fn. */
-		inline ssize_t write_n(const void* buf, size_t n) {
-			NHTTP_INIT_ASSERT(handle, "socket isn't initialized!");
-			return handle->raw.write_n(buf, n);
-		}
+		///* write n bytes explicitly. if under non-blocking, this works same with read() fn. */
+		//inline ssize_t write_n(const void* buf, size_t n) {
+		//	NHTTP_INIT_ASSERT(handle, "socket isn't initialized!");
+		//	return handle->raw.write_n(buf, n);
+		//}
 
 		/* shutdown this socket. */
 		inline bool shutdown(int how = SHUT_RDWR) {
