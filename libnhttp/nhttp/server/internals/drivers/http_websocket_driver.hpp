@@ -94,7 +94,6 @@ namespace drivers {
 
 		uint8_t has_open;
 
-
 	public:
 		http_websocket_driver(const std::shared_ptr<http_websocket>& websocket);
 

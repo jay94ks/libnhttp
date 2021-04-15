@@ -8,6 +8,9 @@ namespace nhttp {
 	class stream;
 
 namespace server {
+	class http_context;
+	class http_request;
+
 namespace drivers {
 	class http_websocket_driver;
 }
@@ -17,7 +20,7 @@ namespace drivers {
 
 	struct http_websocket_params {
 		/* maximum payload per message. */
-		uint64_t max_payload_bytes = 32 * 1024;
+		uint64_t max_message_length = 32 * 1024;
 
 		struct {
 			/* allowed idle before trying to ping. */
@@ -59,25 +62,36 @@ namespace drivers {
 	class NHTTP_API http_websocket : public http_taggable {
 		friend class drivers::http_websocket_driver;
 
-	public:
-		typedef lambda_t<void(http_websocket&)> on_open_callback;
-		typedef lambda_t<void(http_websocket&)> on_close_callback;
-		typedef lambda_t<void(http_websocket&)> on_message_callback;
-
 	private:
+		hal::spinlock_t spinlock;
 		std::shared_ptr<http_context> context;
+		drivers::http_websocket_driver* driver;
 		
-
-	private:
-		/* user side callbacks. */
-		on_open_callback _on_open;
-		on_close_callback _on_close;
-		on_message_callback _on_message;
-
 	public:
 		http_websocket(const std::shared_ptr<http_context>& context)
-			: context(context) { }
+			: context(context), driver(nullptr) { }
 
+	public:
+		/* get original context for getting handshake information. */
+		inline std::shared_ptr<http_context> get_context() const { return context; }
+
+	protected:
+		inline void configure(drivers::http_websocket_driver* driver) {
+			std::lock_guard<decltype(spinlock)> guard(spinlock);
+			this->driver = driver;
+		}
+
+		inline void unconfigure() {
+			std::lock_guard<decltype(spinlock)> guard(spinlock);
+			this->driver = nullptr;
+		}
+
+	public:
+		/* get queued message. for getting message successfully, call this at event occurred. */
+		bool get_message(std::string& out_message) { return false; }
+
+		/* close this websocket immediately. */
+		void close() { }
 	};
 }
 }

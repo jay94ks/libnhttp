@@ -16,10 +16,11 @@ namespace drivers {
 		const std::shared_ptr<http_link>& link)
 	{
 		http_link_driver::on_initiate(socket, asyncs, buffer, link);
-
+		websocket->configure(this);
 	}
 
 	void http_websocket_driver::on_finalize() {
+		websocket->unconfigure();
 		http_link_driver::on_finalize();
 	}
 
