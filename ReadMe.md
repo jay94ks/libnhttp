@@ -9,6 +9,8 @@ Event-driven, streaming HTTP server implementation written in C++.
 This HTTP library provides re-usable implementations for an HTTP server in C++ for `Windows` and `POSIX` operating systems.
 Currently, This only supports HTTP/1.1 and does not support SSL yet, but it will be implemented soon.
 
+Launchpad page: https://launchpad.net/libnhttp
+
 **Table of contents**
 
 * [License](#license)
