@@ -31,7 +31,14 @@ int main(int argc, char** argv) {
 
 int main_real(int argc, char** argv) {
 	socket_watcher watcher(1024);
-	http_listener listener(watcher, http_params());
+	http_params params;
+
+	params.tcp.linger = 0;
+	params.tcp.keepalive.idle = 1;
+	params.tcp.keepalive.interval = 1;
+	params.tcp.keepalive.max = 1;
+
+	http_listener listener(watcher, params);
 
 	ipv4::resolve("google.com", 443);
 	ipv6::resolve("google.com", 443);

@@ -78,7 +78,7 @@ clean:
 	rm -rf test-main.cpp
 
 bench-app: libnhttp.so
-	g++ -O3 -o bench-app ../nhttpd/main.cpp -lpthread -lrt -lnhttp.so
+	g++ -O3 -o bench-app ../nhttpd/main.cpp -lpthread -lrt -lnhttp -std=c++17
 	
 test-app: $(X_CVG_OBJECTS) $(C_CVG_OBJECTS)
 	cp ../libnhttp-tests/main.cpp test-main.cpp
