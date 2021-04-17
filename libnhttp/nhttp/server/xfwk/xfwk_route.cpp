@@ -263,6 +263,7 @@ namespace xfwk {
 			xfwk_route_state deep_state = state;
 
 			bool choosen = false;
+			--deep_state.depth;
 
 			for (auto each : params) {
 				if (each->test(name)) {
