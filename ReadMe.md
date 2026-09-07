@@ -307,31 +307,14 @@ threads / 200 connections / 30s. Apache's stock `MaxRequestWorkers` (150) was ra
 before measuring — the default caps concurrency well below anything a production deployment
 would run, and left unraised it produced socket errors under this load rather than a meaningful
 number. **nhttpd needs no such tuning**: every number below is the untouched library default
-(`blocking_pool_size` = 4) — see [PLAN.md](PLAN.md)'s P4 for why a small pool is now *better*
+(`blocking_pool_size` = 4) — see `CLAUDE.md`'s Phase 16 log for why a small pool is now *better*
 than a large one, the opposite of the advice an earlier round of this benchmark gave.
 
-**Two real bugs in this library were found and fixed while running this benchmark** — both are
-now fixed on `main`, and the numbers below reflect the fixed build:
-
-* **`task<T>` leaked its own coroutine frame on every single `co_await`.** `operator co_await()
-  &&` used to null out the task's own `handle_` when handing an `awaiter` to the compiler, so
-  nothing ever destroyed the callee's completed coroutine frame (`final_suspend` only suspends
-  and transfers control to the continuation — see `include/nhttp/async/task.hpp`'s comment for
-  the full mechanics). `task<T>` is the return type of essentially every async function in this
-  codebase, so this leaked on every nested `co_await` in every request — confirmed with a
-  standalone repro (2,000,000 awaited no-op tasks leaked ~125&nbsp;MB) and observed in the wild as
-  ~24&nbsp;KB/request growth serving static files under sustained keep-alive load (233K requests
-  grew RSS from 5.6&nbsp;MB to 5.78&nbsp;GB). Fixed by leaving `handle_` in place so the task
-  object's own destructor — which already correctly calls `handle_.destroy()` — runs at the end
-  of the `co_await` expression's full-expression lifetime, exactly like cppcoro-style task types.
-* **A client that resets a connection mid-response killed the entire server.** A `write()` to an
-  already-reset socket raises `SIGPIPE`, whose default disposition terminates the whole process
-  instantly — no core, nothing for a debugger or sanitizer to catch, which is why this looked like
-  a mysterious silent crash until traced with `strace`. Any sustained-load benchmark reliably
-  triggers it (guaranteed at minimum when the client tears down its connection pool at a run's
-  end). Fixed by ignoring `SIGPIPE` in `listener`'s constructor on POSIX (Windows has no `SIGPIPE`
-  for socket writes — it reports `WSAECONNRESET`/`WSAECONNABORTED` instead); the resulting `EPIPE`
-  from `write()` was already handled correctly as an ordinary closed connection.
+**Two real bugs in this library were found and fixed while running this benchmark** (both now
+fixed on `main`, numbers below reflect the fixed build): a systemic `task<T>` coroutine-frame leak
+on every `co_await` (~24&nbsp;KB/request under sustained load), and a `SIGPIPE` from a client
+resetting its connection killing the entire server process. See `CLAUDE.md`'s Phase 15 log for the
+full root-cause story of each.
 
 ### Loopback (same-kernel), current `main`
 
@@ -343,42 +326,15 @@ now fixed on `main`, and the numbers below reflect the fixed build:
 
 nhttpd went from 13.8K req/s (the state this Benchmarks section originally documented) to 58K
 req/s on this exact benchmark — a ~4.2× improvement, now clearly ahead of Apache and at roughly
-half of nginx's throughput, instead of a tenth of it. [PLAN.md](PLAN.md) has the full, honest
-account of everything tried to get here, including two dead ends that were implemented, measured,
-and reverted rather than kept on the strength of theory alone:
-
-* **P1 — a `sendfile(2)` fast path for static files.** The single largest win: a whole-file GET
-  now goes straight from the file descriptor to the socket in one syscall, bypassing the blocking
-  thread pool and every userspace buffer copy that the generic read/write loop needed.
-* **P2 — cut redundant thread-pool round trips.** `overlay`/`single_file` no longer stat the same
-  path twice (once in `wants()`, once in `handle()`), and `file_stream::open()` combines its
-  `fopen` and size probe into one thread-pool hop instead of two.
-* **P3 — a custom coroutine-frame allocator: tried, measured, reverted.** Implemented a
-  thread-local size-bucketed free-list allocator for `task<T>`'s frames; A/B benchmarking showed
-  no measurable improvement (glibc's `tcache`, already thread-local and size-classed, already
-  covers this).
-* **P4 — `thread_pool`'s job queue: three iterations, the last one shipped.** ① A `std::counting_
-  semaphore`-backed lock-free queue measured ~2× *slower* under sustained load, because it forces
-  every dequeue — even by an already-busy worker — to pay a synchronization cost the original
-  mutex+queue could skip while "hot". ② A lock-free queue paired with a mutex+condvar used only
-  for waking idle workers fixed that, but only once `blocking_pool_size` stopped being
-  over-provisioned: at a large pool size (64, this benchmark's own earlier tuning advice) 64
-  OS threads contending over 8 CPU cores lost far more to context-switch overhead than the
-  lock-free queue saved, while at a small pool size the same design hit 68K+ req/s — the best
-  result of the whole round. ③ Simplified further by dropping an atomic "is anyone waiting"
-  gate around the wake-up notification: glibc's `condition_variable::notify_one()` already skips
-  the underlying wake syscall when nothing is waiting, so the gate was one more load and branch
-  per job for a syscall skip the library was already doing — measured equivalent, kept for the
-  simpler code. **Net effect: `blocking_pool_size` no longer needs manual tuning at all — the
-  library's own small default is now the fastest setting**, the opposite of what this section
-  used to recommend.
-* **P5 — a windowed `mmap` read path.** `io::file_stream` can now memory-map a file instead of
-  using buffered `fread()`, sliding a bounded (4&nbsp;MiB) window across it rather than ever
-  mapping an entire large file — see `platform::file_mapping`. Opened *lazily*, on a stream's
-  first actual `read()` call, specifically because a whole-file GET (P1's sendfile path) never
-  calls `read()` at all; an eager open in every case was tried first and measurably regressed
-  the common case by paying for a mapping that would never be used. Only byte-`Range`/TLS/chunked
-  responses — the ones sendfile can't take — exercise this path today.
+half of nginx's throughput, instead of a tenth of it. This came from a `sendfile(2)` fast path for
+whole-file responses, cutting redundant thread-pool round trips, a rebuilt lock-free `thread_pool`
+job queue (three iterations — two measured as regressions and reverted before the third one
+stuck), and a windowed `mmap` read path for the requests sendfile can't take (byte-`Range`, TLS,
+chunked). `blocking_pool_size` needs no manual tuning anymore — the library's own small default is
+now the fastest setting, the opposite of what this section used to recommend. The full account,
+including what was tried and reverted along the way and why, lives in `CLAUDE.md`'s Phase 16 log;
+`PLAN.md` tracks only what's still open (a Windows equivalent of the sendfile path, and real
+`perf`-based profiling on a host that can run it).
 
 ### Docker network-stack benchmark
 
@@ -426,7 +382,7 @@ efficiency, not just a throughput number.
   spec for "does the new API still let a caller express the same intent."
 * [docs/protocol-extensibility.md](docs/protocol-extensibility.md) — a review of the design
   against the architectural seams HTTP/2 needed (all three held unchanged) and QUIC still would.
-* [PLAN.md](PLAN.md) — the performance-improvement plan to close the gap shown in the Benchmarks
-  section above, prioritized by expected impact.
+* [PLAN.md](PLAN.md) — the live to-do list of open performance follow-ups; finished work is
+  removed from it once done (its history lives in `CLAUDE.md`'s phase log instead).
 * [CLAUDE.md](CLAUDE.md) — the running build/architecture/decisions log for anyone (human or
   otherwise) picking up work on this repo.

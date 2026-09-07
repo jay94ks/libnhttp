@@ -31,11 +31,13 @@ carry forward. If you need to know "how did the old code do X," read `CONCEPTS.m
 first — they're the curated summary; only dig into `libnhttp/nhttp/**` directly for something
 those two docs don't cover.
 
-A third document looks forward instead of back: [`PLAN.md`](PLAN.md) is the prioritized
-performance-improvement plan written after Phase 15's benchmark round (see that phase's entry
-below) found nhttpd well behind nginx/Apache serving static files. If you're picking up
-performance work on this repo, start there rather than re-deriving priorities from scratch —
-it's ordered by expected impact vs. effort and explains why each item is scoped the way it is.
+A third document looks forward instead of back: [`PLAN.md`](PLAN.md) is a live to-do list of open
+performance follow-ups, started after Phase 15's benchmark round (see that phase's entry below)
+found nhttpd well behind nginx/Apache serving static files. It only ever tracks *unfinished* work
+— an item is deleted from it once done, and its full story (what was tried, measured, kept, or
+reverted) moves permanently into this file's phase log instead (see Phase 16). If you're picking
+up performance work on this repo, check `PLAN.md` first for what's still open, and this file's
+phase log for the history behind what's already done.
 
 The full redesign plan (architecture + phased build order) lives at
 `C:\Users\jay94\.claude\plans\dazzling-fluttering-badger.md` on the machine this was planned on
@@ -698,134 +700,73 @@ zero compiler warnings, **on both platforms**, before moving on.
     (verifying real interleaving, not just sequential completion). Full suite: 113/113 passing
     warning-free on Linux and Windows.
 - **Phase 15 (benchmarking against nginx/Apache) — done.** At the user's request to benchmark
-  against nginx and Apache 2 and reflect the results in `ReadMe.md`. Found and fixed two real
-  bugs along the way — a sustained-load benchmark is exactly the kind of exercise the existing
-  test suite (dozens of requests per test, not hundreds of thousands) was never going to surface
-  these under, and both are now fixed on `main`, not just noted as known gaps:
-  1. **`task<T>` leaked its own coroutine frame on every single `co_await`, since the very first
-     commit of this rewrite.** `include/nhttp/async/task.hpp`'s `operator co_await() &&` used to
-     `std::exchange(handle_, nullptr)` — handing the callee's coroutine handle to a throwaway
-     `awaiter` that never destroys it, while nulling the task object's own `handle_` so *its*
-     destructor (the only thing that ever calls `handle_.destroy()`) becomes a no-op too.
-     `final_suspend()` only suspends and symmetric-transfers to the continuation; it never
-     destroys the frame either. Net effect: nothing, ever, destroyed a completed task's
-     coroutine frame. Since `task<T>` is the return type of nearly every async function in this
-     codebase, every nested `co_await` anywhere leaked. Caught via a sustained `wrk` benchmark
-     showing static-file-serving RSS grow from 5.6&nbsp;MB to 5.78&nbsp;GB over 233K requests
-     (~24&nbsp;KB/request — plausible given a request chains dozens of `task<T>`-returning calls,
-     several with multi-KB stack-local buffers baked into their coroutine frames, e.g.
-     `write_message_body`'s/`read_headers`'s 4&nbsp;KB scratch buffers). Confirmed in isolation
-     with a minimal repro outside the server entirely: 2,000,000 awaited no-op `task<int>`s
-     leaked ~125&nbsp;MB; after the fix, ~0. **Fix**: stop nulling `handle_` in
-     `operator co_await()`. For the common `co_await foo()` form, `foo()` is a prvalue temporary
-     whose lifetime — ordinary C++ temporary-lifetime rules — extends to the end of the full
-     expression, i.e. past `await_resume()`; leaving `handle_` in place lets the task object's
-     own destructor correctly free the now-completed frame right after, exactly the pattern
-     cppcoro-style task types use. Verified: existing 113/113 tests still pass unchanged (the fix
-     only changes *when* memory is freed, not any observable result — `await_resume()` already
-     extracted results through the awaiter's own copy of the handle in both old and new code), a
-     30s/200-connection sustained benchmark now holds RSS flat (~13&nbsp;MB) instead of
-     ballooning, and grep confirmed nothing in the codebase relies on the old (accidentally
-     early) invalidation of a `task`'s `.valid()`/`.done()` after awaiting it.
-  2. **A client resetting a connection mid-response killed the entire server process, not just
-     that connection.** A `write()` to a socket the peer already reset raises `SIGPIPE`, whose
-     default disposition is to terminate the whole process — instantly, with no core dump and
-     nothing for a debugger or sanitizer to catch (confirmed: an ASan+UBSan build of the exact
-     same binary produced zero sanitizer output when it died this way, and the WSL kernel's own
-     crash capture — which *did* catch fatal signals like `SIGABRT` earlier in this same
-     investigation — logged nothing either). This is what made it look like a mysterious silent
-     crash at first; root-caused by wrapping the server in `strace -f -e trace=exit,exit_group,
-     kill,tkill,tgkill,rt_sigaction`, which showed `+++ killed by SIGPIPE +++` across every
-     thread the instant `wrk` tore down its connection pool at a benchmark run's end — a
-     genuinely routine event under any real load, not an edge case. **Fix**:
-     `std::signal(SIGPIPE, SIG_IGN)` in `listener`'s constructor (POSIX-only —
-     `src/server/listener.cpp`; Windows has no `SIGPIPE` for socket writes, it reports
-     `WSAECONNRESET`/`WSAECONNABORTED` as ordinary error returns instead). The resulting `EPIPE`
-     from a subsequent `write()` was already handled correctly by the existing socket-error path
-     as a closed connection — no other code needed to change. Verified: 113/113 tests still pass,
-     and the same benchmark that used to kill the process within 5–30 seconds now runs
-     426,113 requests over 30s without dying, memory-stable, and answers a `curl` immediately
-     afterward.
-  - **Benchmark methodology**: nginx 1.24 and Apache 2.4.58 (event MPM, `MaxRequestWorkers`
-    raised 150→800 — the stock default caps concurrency well below anything production-tuned)
-    installed via `apt` in this machine's WSL Ubuntu, serving an identical deterministic
-    10&nbsp;KB static HTML file; nhttpd benchmarked via a small standalone `bench_server.cpp`
-    (not `examples/nhttpd`, which binds both loopback stacks and doesn't take a tunable
-    `blocking_pool_size` from the CLI) with `blocking_pool_size` raised 4→64 for the same
-    fairness reason as Apache's tuning. `wrk -t8 -c200 -d30s --latency` in both a same-host
-    loopback configuration and a Docker Compose stack (`benchmark/docker/` — three server
-    containers on one bridge network with identical `cpus`/`mem_limit` caps, driven by a fourth
-    client container issuing `wrk` by container DNS name) — the latter exists because same-kernel
-    loopback benchmarking skips real NIC-path kernel work (framing, driver queueing, checksums)
-    that a Docker bridge network's veth-pair-plus-bridge path actually exercises. Full numbers
-    and reproduction steps are in `ReadMe.md`'s Benchmarks section, not duplicated here.
-  - **Result, honestly**: even after both fixes, nhttpd trails nginx and Apache on this specific
-    micro-benchmark (repeatedly serving one small static file) — 13.8K req/s vs. nginx's 139K and
-    Apache's 38.6K on loopback, same relative gap in the Docker benchmark. This is a real,
-    unoptimized architectural gap (every static-file request round-trips the blocking thread pool
-    several times — stat, open, size, read, close — where nginx uses one zero-copy `sendfile()`
-    call), not a bug, and not addressed in this phase. See [PLAN.md](PLAN.md) for the prioritized
-    plan to close it, written directly from what this benchmarking round found.
-- **Phase 16 (executing PLAN.md — P1 through P5) — done.** At the user's explicit request to
-  execute everything PLAN.md proposed, including two items (P3, and P4's later iterations) whose
-  own text said not to attempt them without profiling data the user asked for anyway. Full
-  results, numbers, and reproduction steps are in `ReadMe.md`'s Benchmarks section and `PLAN.md`
-  itself (each item's entry there was rewritten in place to record what actually happened, not
-  left as a stale plan next to a separate "here's what we did" log) — this entry is the short
-  version plus anything not already covered there.
-  - **Combined result**: loopback 13.8K → 58.0K req/s (~4.2×), Docker network-stack benchmark
-    11.2K → 35.9K req/s (~3.2×) — nhttpd now beats Apache in both and closes most of the remaining
-    gap to nginx (roughly half its throughput on loopback, two-thirds in Docker, up from a tenth
-    and a sixth respectively).
-  - **P1 (`sendfile(2)` fast path) and P2 (fewer thread-pool round trips)** landed together;
-    `io::file_stream` gained `native_fd()`, `platform::socket_handle` gained `send_file()`/
-    `supports_send_file()` (Windows correctly reports `false` — `TransmitFile` needs the real
-    IOCP completion model this reactor's plain reads/writes deliberately don't use, a risk not
-    worth taking without being able to verify the overlapped-completion edge cases as rigorously
-    as everything else here), and `overlay`/`single_file` stopped double-`stat()`ing a request
-    between `wants()` and `handle()`.
-  - **P3 (a custom coroutine-frame allocator) was implemented, benchmarked, and reverted** — no
-    measurable win over glibc's own `tcache`, which already does almost exactly the same thing.
-    `include/nhttp/async/task.hpp` is back to exactly the Phase 15 fix, nothing more.
-  - **P4 (`thread_pool`'s job queue) went through three real iterations, not one**, and is the
-    most instructive result in this phase: a `std::counting_semaphore`-based lock-free queue
-    measured *~2× slower*; a lock-free queue paired with a plain mutex+condvar used only to wake
-    idle workers fixed that, but only once `blocking_pool_size` stopped being deliberately
-    over-provisioned — at the large pool size (64) this document's own earlier tuning advice
-    recommended, 64 threads contending over this machine's 8 CPU cores lost far more to
-    context-switch overhead than the lock-free queue saved (confirmed directly: the *old*
-    mutex+`std::queue` design got *faster* going from pool size 64 to 8, the lock-free design got
-    *slower* the same direction — opposite trends, both real); at the library's own untouched
-    default (`blocking_pool_size` = 4) it hit ~69K req/s, the best result of the whole phase.
-    `blocking_pool_size` needs no manual tuning at all now — a complete reversal of what this repo
-    used to recommend. A follow-up simplification (dropping an atomic "is anyone waiting" gate
-    around the wake notification, since glibc's `condition_variable::notify_one()` already skips
-    its own futex-wake syscall when nothing is waiting) measured equivalent and was kept for the
-    simpler code. Added `include/nhttp/async/detail/mpmc_queue.hpp` (Dmitry Vyukov's bounded MPMC
-    design) with its own dedicated stress test (`tests/unit/test_mpmc_queue.cpp` — 8 producers ×
-    4 consumers × 20,000 items each through a deliberately undersized queue, checking every item
-    delivered exactly once) verified clean under ThreadSanitizer alongside the full suite, for
-    every iteration, before any of them were benchmarked.
-  - **P5 (a windowed, memory-mapped file read path)** added `platform::file_mapping` — bounded to
-    a 4&nbsp;MiB sliding window rather than ever mapping an entire file (a multi-gigabyte file
-    mapped whole just to serve a small byte-`Range` request would waste address space/page-table
-    setup at best, exhaust it outright on a 32-bit target at worst). The mapping is opened
-    *lazily*, on a stream's first actual `read()` call, not eagerly in `open()` — an eager version
-    was tried first and measurably regressed the common whole-file-GET case, which never calls
-    `read()` at all once P1's sendfile path exists, by paying for a mapping that request would
-    never use.
-  - **A real anomaly noticed and corrected during this phase, unrelated to the work itself**: two
-    files unrelated to this session's changes (`.gitignore`, `LICENSE`) and one legacy benchmark
-    asset (`benchmark/benchmark-1.jmx`) picked up a line-ending-only (LF→CRLF) diff as a side
-    effect of a `git stash`/`stash pop` round trip used to A/B-test P4's design against the
-    pre-P4 baseline. No content changed. Reverted via `git checkout` before committing rather than
-    carried along as unrelated noise.
+  against nginx and Apache 2 and reflect the results in `ReadMe.md`. A sustained-load benchmark
+  (something the existing test suite, dozens of requests per test, never exercised) found and led
+  to fixing two real bugs, now on `main`:
+  1. **`task<T>` leaked its own coroutine frame on every `co_await`, since this rewrite's first
+     commit.** `operator co_await() &&` nulled the task's own `handle_` when handing the coroutine
+     handle to a throwaway `awaiter` that never destroyed it — so nothing, ever, freed a completed
+     task's frame. Since `task<T>` is the return type of nearly every async function here, this
+     leaked on every nested `co_await` everywhere. Found via RSS growing 5.6&nbsp;MB → 5.78&nbsp;GB
+     over 233K static-file requests; confirmed in isolation (2,000,000 awaited no-op tasks leaked
+     ~125&nbsp;MB). **Fix**: stop nulling `handle_`, so the task object's own destructor frees the
+     frame at the end of the `co_await` expression's temporary lifetime — the standard
+     cppcoro-style pattern. Verified: 113/113 tests unchanged, RSS now flat under sustained load.
+  2. **A client resetting a connection mid-response killed the entire process.** `write()` to an
+     already-reset socket raises `SIGPIPE`, whose default disposition kills the whole process
+     instantly with nothing for a debugger/sanitizer to catch — root-caused via `strace`, which
+     showed `+++ killed by SIGPIPE +++` the instant `wrk` tore down its connection pool. **Fix**:
+     `std::signal(SIGPIPE, SIG_IGN)` in `listener`'s constructor, POSIX-only (Windows reports
+     `WSAECONNRESET` instead, no signal involved). Verified: 113/113 tests pass, and the benchmark
+     that used to die within 30s now runs 426,113 requests without dying.
+  - **Methodology**: nginx 1.24 and Apache 2.4.58 (event MPM, `MaxRequestWorkers` tuned 150→800)
+    via `apt` on this machine's WSL Ubuntu, serving an identical 10&nbsp;KB static file;
+    `wrk -t8 -c200 -d30s --latency`, both same-host loopback and a Docker Compose stack
+    (`benchmark/docker/` — exercises real bridge-network kernel paths a loopback benchmark skips).
+    Full numbers in `ReadMe.md`'s Benchmarks section.
+  - **Result, honestly**: even after both fixes, nhttpd trailed nginx/Apache badly on this
+    micro-benchmark (13.8K req/s vs. nginx's 139K, Apache's 38.6K) — a real, unoptimized
+    architectural gap (every static-file request round-trips the blocking thread pool several
+    times, where nginx uses one zero-copy `sendfile()` call), not a bug. See [PLAN.md](PLAN.md)
+    (at the time) / Phase 16 below for closing it.
+- **Phase 16 (executing PLAN.md — P1 through P5) — done.** At the user's request, every item in
+  the performance plan was executed, including two (P3, and part of P4) whose own text said not to
+  attempt them without profiling data — done anyway, with each outcome decided by A/B benchmarking.
+  Full numbers are in `ReadMe.md`'s Benchmarks section; `PLAN.md` itself now only tracks what's
+  still open (Windows `TransmitFile` for P1's sendfile path; real `perf` profiling on a host that
+  can run it, since this WSL2 kernel can't). Combined result: loopback 13.8K → 58.0K req/s (~4.2×),
+  Docker network-stack benchmark 11.2K → 35.9K req/s (~3.2×) — nhttpd now beats Apache in both.
+  - **P1/P2**: a `sendfile(2)` fast path (`io::file_stream::native_fd()`, `platform::
+    socket_handle::send_file()`/`supports_send_file()` — `false` on Windows, deferred rather than
+    risking an unverifiable `TransmitFile`/IOCP integration) plus removing a redundant `stat()`
+    between `overlay`/`single_file`'s `wants()` and `handle()`.
+  - **P3**: a custom coroutine-frame allocator for `task<T>` — implemented, benchmarked, no
+    measurable win over glibc's own `tcache`. Reverted; `task.hpp` is back to the Phase 15 fix only.
+  - **P4**: `thread_pool`'s job queue, three iterations. A `std::counting_semaphore`-based
+    lock-free queue measured **~2× slower** (every dequeue pays a sync cost even when the worker's
+    already busy, unlike the mutex it replaced). A lock-free queue + mutex/condvar used only to
+    wake idle workers fixed that, but only once `blocking_pool_size` stopped being
+    over-provisioned: 64 threads contending over 8 cores lost more to context-switching than the
+    lock-free queue saved, while the library's own default (4) hit **~69K req/s**, the best result
+    of the phase — `blocking_pool_size` needs no manual tuning anymore, reversing this repo's prior
+    advice. A further simplification (dropping an atomic wait-count gate around the wake
+    notification, since glibc's `notify_one()` already skips its own syscall when nothing's
+    waiting) measured equivalent and was kept for the simpler code. New:
+    `include/nhttp/async/detail/mpmc_queue.hpp` (Vyukov's bounded MPMC design) with its own stress
+    test; every iteration verified clean under ThreadSanitizer before being benchmarked.
+  - **P5**: `platform::file_mapping` — a memory-mapped read path for `io::file_stream`, bounded to
+    a sliding 4&nbsp;MiB window (never the whole file, to avoid exhausting address space on huge
+    files) and opened *lazily* on a stream's first `read()` call. An eager version (opened in
+    `open()`) was tried first and measurably regressed the common whole-file-GET case, which never
+    calls `read()` at all once P1's sendfile path exists.
+  - **Unrelated anomaly, noticed and corrected**: `.gitignore`, `LICENSE`, and
+    `benchmark/benchmark-1.jmx` picked up a line-ending-only (LF→CRLF) diff as a side effect of a
+    `git stash`/`stash pop` used to A/B-test P4 against the pre-P4 baseline. No content changed;
+    reverted via `git checkout` before committing.
 - Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8), Phase 12's noted
-  OpenSSL-on-Windows build-environment gap, and whatever `PLAN.md` records as still open after
-  Phase 16 (P5's own entry there notes a couple of narrower follow-ups — Windows `TransmitFile`
-  for P1, and profiling P3/P4-adjacent questions properly on a host that can actually run `perf`).
+  OpenSSL-on-Windows build-environment gap, and whatever `PLAN.md` currently tracks as open.
   Future work on this repo starts from here — see the module map and build instructions above,
-  `ReadMe.md` for the user-facing API tour, and `PLAN.md` for the full performance-work record.
+  `ReadMe.md` for the user-facing API tour, and `PLAN.md` for the current performance to-do list.
 
 ## Working style notes for this repo specifically
 
