@@ -147,8 +147,27 @@ namespace nhttp::router {
 	}
 
 	target_ptr route::get_target(const protocol::http_method& m) const {
-		const auto it = method_targets_.find(m.name());
-		return it == method_targets_.end() ? nullptr : it->second;
+		const bool custom = m.id() == protocol::http_method_id::custom;
+
+		for (const method_target_entry& e : method_targets_) {
+			if (e.id == m.id() && (!custom || e.name == m.name()))
+				return e.target;
+		}
+
+		return nullptr;
+	}
+
+	void route::set_target(protocol::http_method_id id, std::string_view name, target_ptr t) {
+		const bool custom = id == protocol::http_method_id::custom;
+
+		for (method_target_entry& e : method_targets_) {
+			if (e.id == id && (!custom || e.name == name)) {
+				e.target = std::move(t);
+				return;
+			}
+		}
+
+		method_targets_.push_back({ id, std::string(name), std::move(t) });
 	}
 
 	std::shared_ptr<facade> route::any(target_ptr t) {
@@ -161,7 +180,7 @@ namespace nhttp::router {
 		};
 
 		for (const method_fn m : all_methods)
-			method_targets_[m().name()] = t;
+			set_target(m().id(), m().name(), t);
 
 		return shared_from_this();
 	}
@@ -172,7 +191,7 @@ namespace nhttp::router {
 	}
 
 	std::shared_ptr<facade> route::method(const protocol::http_method& m, target_ptr t) {
-		method_targets_[m.name()] = std::move(t);
+		set_target(m.id(), m.name(), std::move(t));
 		return shared_from_this();
 	}
 

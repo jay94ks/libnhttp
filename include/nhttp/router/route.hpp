@@ -129,6 +129,7 @@ namespace nhttp::router {
 		route_ptr find_or_create_static_child(std::string_view name);
 		route_ptr find_or_create_param_child(std::string_view name);
 		route_ptr find_or_create_wildcard_child();
+		void set_target(protocol::http_method_id id, std::string_view name, target_ptr t);
 
 	private:
 		route_kind kind_;
@@ -139,7 +140,20 @@ namespace nhttp::router {
 		std::vector<route_ptr> param_children_;
 		route_ptr wildcard_child_;
 
-		std::map<std::string, target_ptr> method_targets_; // key = method name, or "*" for any()
+		/* one entry per registered method on this node -- a handful at most, so
+		 * a linearly-scanned flat vector beats a std::map<string, target_ptr>'s
+		 * red-black-tree node allocations the same way route_state::captures'
+		 * capture_map does. `id` alone disambiguates the 9 known methods (a
+		 * plain integer compare, no string touched); `name` only matters, and
+		 * is only compared, for a custom/WebDAV-style method (id == custom),
+		 * where it's what tells two different custom methods apart. */
+		struct method_target_entry {
+			protocol::http_method_id id;
+			std::string name;
+			target_ptr target;
+		};
+
+		std::vector<method_target_entry> method_targets_;
 		middleware_stack middlewares_;
 	};
 

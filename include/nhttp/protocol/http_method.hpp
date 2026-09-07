@@ -25,6 +25,19 @@ namespace nhttp::protocol {
 	}
 
 	/**
+	 * a cheap identity for the 9 known methods, `custom` for anything else.
+	 * exists so code keying on "which method is this" (e.g. `route::
+	 * method_targets_`) can compare a small integer instead of the method's
+	 * own name string — see PLAN.md's router item and CLAUDE.md's phase log
+	 * for why this was added. Not a replacement for `name()`: a `custom`
+	 * method still needs its name to tell two different custom methods apart.
+	 */
+	enum class http_method_id : std::uint8_t {
+		custom = 0,
+		get, head, post, put, del, patch, options, trace, connect
+	};
+
+	/**
 	 * class http_method.
 	 * an HTTP method name plus its conventional semantic flags, looked up from a
 	 * small table rather than switched on per call site — see CONCEPTS.md's
@@ -39,6 +52,7 @@ namespace nhttp::protocol {
 	public:
 		const std::string& name() const noexcept { return name_; }
 		http_method_flags flags() const noexcept { return flags_; }
+		http_method_id id() const noexcept { return id_; }
 		bool is(http_method_flags flag) const noexcept { return (flags_ & flag) != http_method_flags::none; }
 
 		bool operator==(const http_method& other) const noexcept { return name_ == other.name_; }
@@ -59,6 +73,7 @@ namespace nhttp::protocol {
 	private:
 		std::string name_;
 		http_method_flags flags_ = http_method_flags::none;
+		http_method_id id_ = http_method_id::custom;
 	};
 
 }

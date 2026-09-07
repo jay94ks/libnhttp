@@ -9,34 +9,39 @@ namespace nhttp::protocol {
 		struct known_entry {
 			std::string_view name;
 			http_method_flags flags;
+			http_method_id id;
 		};
 
 		constexpr std::array<known_entry, 9> known_methods{ {
-			{ "GET", http_method_flags::response_content | http_method_flags::idempotent | http_method_flags::cacheable },
-			{ "HEAD", http_method_flags::idempotent | http_method_flags::cacheable },
-			{ "POST", http_method_flags::request_content | http_method_flags::response_content | http_method_flags::alter_state | http_method_flags::conditional_cacheable },
-			{ "PUT", http_method_flags::request_content | http_method_flags::alter_state | http_method_flags::idempotent },
-			{ "DELETE", http_method_flags::alter_state | http_method_flags::idempotent },
-			{ "PATCH", http_method_flags::request_content | http_method_flags::alter_state },
-			{ "OPTIONS", http_method_flags::idempotent },
-			{ "TRACE", http_method_flags::idempotent },
-			{ "CONNECT", http_method_flags::alter_state },
+			{ "GET", http_method_flags::response_content | http_method_flags::idempotent | http_method_flags::cacheable, http_method_id::get },
+			{ "HEAD", http_method_flags::idempotent | http_method_flags::cacheable, http_method_id::head },
+			{ "POST", http_method_flags::request_content | http_method_flags::response_content | http_method_flags::alter_state | http_method_flags::conditional_cacheable, http_method_id::post },
+			{ "PUT", http_method_flags::request_content | http_method_flags::alter_state | http_method_flags::idempotent, http_method_id::put },
+			{ "DELETE", http_method_flags::alter_state | http_method_flags::idempotent, http_method_id::del },
+			{ "PATCH", http_method_flags::request_content | http_method_flags::alter_state, http_method_id::patch },
+			{ "OPTIONS", http_method_flags::idempotent, http_method_id::options },
+			{ "TRACE", http_method_flags::idempotent, http_method_id::trace },
+			{ "CONNECT", http_method_flags::alter_state, http_method_id::connect },
 		} };
 
-		http_method_flags flags_for(std::string_view name) noexcept {
+		const known_entry* find_known(std::string_view name) noexcept {
 			for (const known_entry& e : known_methods) {
 				if (e.name == name)
-					return e.flags;
+					return &e;
 			}
 
-			return http_method_flags::none;
+			return nullptr;
 		}
 
 	}
 
 	http_method::http_method(std::string name)
-		: name_(std::move(name)), flags_(flags_for(name_))
+		: name_(std::move(name))
 	{
+		if (const known_entry* e = find_known(name_)) {
+			flags_ = e->flags;
+			id_ = e->id;
+		}
 	}
 
 #define NHTTP_DEFINE_METHOD(fn, literal) \

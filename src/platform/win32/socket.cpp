@@ -177,18 +177,23 @@ namespace nhttp::platform {
 	}
 
 	bool socket_handle::supports_send_file() noexcept {
-		// TransmitFile is Windows' sendfile(2) equivalent, but only offers a
-		// non-blocking-friendly form via OVERLAPPED I/O + IOCP completion —
-		// this reactor's plain read/write path deliberately stays on the
-		// simpler WSAEventSelect-then-retry model (see CLAUDE.md's Phase 12
-		// design note), which TransmitFile doesn't fit without a real
-		// completion-based driver. Deferred; see PLAN.md's P1.
-		return false;
+		// TransmitFile is Windows' sendfile(2) equivalent — implemented, but
+		// not through this synchronous-retry-shaped function: TransmitFile
+		// with lpOverlapped == NULL runs fully synchronously regardless of the
+		// socket's non-blocking mode (blocking the caller until the whole
+		// transfer completes, which a reactor thread must never do), so a
+		// real overlapped completion is required, not a would-block/retry
+		// loop. See async_socket::send_file's Windows branch (src/async/
+		// socket.cpp) for the actual implementation, and CLAUDE.md's phase
+		// log for the full design story.
+		return true;
 	}
 
 	std::int64_t socket_handle::send_file(int, std::int64_t&, std::size_t) const noexcept {
-		// never called: supports_send_file() is false on this platform, and
-		// every caller is required to check that first.
+		// never called: the Windows fast path lives in async_socket::
+		// send_file instead (see supports_send_file()'s comment above) — it
+		// needs a real overlapped completion, which this synchronous,
+		// POSIX-sendfile(2)-shaped function signature can't express.
 		::WSASetLastError(WSAEOPNOTSUPP);
 		return -1;
 	}

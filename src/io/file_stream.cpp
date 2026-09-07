@@ -240,7 +240,13 @@ namespace nhttp::io {
 
 	int file_stream::native_fd() const noexcept {
 #if defined(_WIN32)
-		return -1;
+		// a CRT fd, not a raw Win32 HANDLE — matching this function's
+		// existing POSIX contract (io::file_stream::native_fd() returns
+		// "whatever this platform's native_fd()-consuming code expects", and
+		// async_socket::send_file's Windows branch converts this to a real
+		// HANDLE via _get_osfhandle() itself, right where TransmitFile needs
+		// it).
+		return file_ ? ::_fileno(file_) : -1;
 #else
 		return file_ ? ::fileno(file_) : -1;
 #endif

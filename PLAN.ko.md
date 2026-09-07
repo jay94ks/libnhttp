@@ -10,31 +10,11 @@
 
 ## 남은 작업
 
-- **Windows: 정적 파일 응답을 위한 `sendfile(2)` 대응물.** Linux 고속 경로(`CLAUDE.md`의
-  Phase 16 로그 참고)는 아직 Windows 대응물이 없습니다 — `platform::socket_handle::
-  supports_send_file()`는 거기서 `false`를 반환해서, 모든 응답이 일반 read/write 경로로
-  폴백합니다. `TransmitFile`이 자연스러운 선택이지만, 이 리액터의 평범한 읽기/쓰기가 지금
-  쓰지 않는 진짜 오버랩드 I/O 완료 처리가 필요합니다; 대충 얹는 게 아니라 그게 설계되고
-  검증 가능해진 뒤에 하세요.
-- **실제로 `perf`를 돌릴 수 있는 호스트가 이제 생겼으니, 그걸로 하는 진짜 프로파일링.**
-  Phase 16의 걸림돌(이 WSL2 커널에 맞는 `linux-tools` 패키지가 없던 것)은 더 이상 유효하지
-  않습니다 — `perf stat`과 `perf record -g` 둘 다 여기서 잘 동작합니다(유저스페이스 심볼은
-  잘 풀리고, 커널 심볼은 여전히 안 풀리지만 이 코드베이스 자체를 프로파일링하는 데는 상관
-  없습니다). Phase 17에서 이걸로 아래 router 항목을 해결했지만, Phase 16이 A/B 벤치마크로만
-  해결할 수밖에 없었던 두 가지 질문은 아직 실제 프로파일로 다시 살펴볼 가치가 남아 있습니다:
-  코루틴 프레임 할당 처리량(P3, 측정된 개선이 없어서 반려됨)과 "워커를 과다 프로비저닝하지
-  말 것" 이상의 더 세밀한 `thread_pool` 튜닝(P4) — 둘 다 `CLAUDE.md`의 Phase 16 로그에
-  있습니다.
-- **`route::method_targets_`의 문자열 키 조회.** 같은 항목의 더 영향이 큰 두 부분(`route_state`의
-  캡처 맵과 후보별 predicate 할당)은 Phase 17에서 고쳤습니다(`CLAUDE.md`의 phase 로그 참고) —
-  `benchmark/router/bench_router_main.cpp`를 `perf`로 프로파일링해서 둘 다 실제 핫스팟임을
-  확인한 뒤였습니다. 늘 우선순위가 낮았던 이 세 번째 부분만 아직 남아 있습니다:
-  `route::method_targets_`는 메서드 *이름 문자열*로 키를 잡은 `std::map<std::string,
-  target_ptr>`이고, 매치된 요청당 `get_target()`으로 한 번만 조회됩니다 — 백트래킹 중 방문하는
-  트리 노드마다 치르는 다른 둘보다는 저렴하지만(요청당 O(1)), 그래도 `protocol::http_method`가
-  오늘 시점에 더 저렴한 식별자를 갖고 있지 않은 채 문자열 비교 트리 조회를 하는 셈입니다. 언젠가
-  이게 해볼 가치가 있다고 측정되면 `protocol::http_method`에 작은 enum/id를 추가할 가치가
-  있습니다 — 이제 그걸 A/B할 기준선으로 `bench_router_main.cpp`가 존재합니다.
+지금은 없습니다 — Phase 18(`CLAUDE.md`의 phase 로그 참고)에서 이 파일이 추적하던 항목을 전부
+마무리했습니다: Windows용 `TransmitFile` 기반 `sendfile(2)` 대응물, P3/P4를 실제 `perf`로 다시
+살펴본 것, 그리고 `route::method_targets_`의 문자열 키 조회까지. 각각의 전체 이야기는
+`CLAUDE.md`의 phase 로그에서, 핵심 수치는 `ReadMe.md`의 벤치마크 섹션에서 확인하세요 — 여기서
+새 성능 작업을 시작하기 전에 먼저 보세요.
 
 ## 이 계획에서 명시적으로 제외되는 것
 

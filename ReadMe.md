@@ -299,6 +299,16 @@ difference from Linux: Windows has no `SO_REUSEPORT` equivalent, so `listener` f
 single accept loop that explicitly round-robins connections across workers there (see the
 architecture overview above) — functionally equivalent, just not kernel-balanced.
 
+Static-file responses also get a real zero-copy fast path here, same as Linux's `sendfile(2)`:
+`platform::socket_handle::supports_send_file()` is `true` on Windows too, backed by `TransmitFile`
+over a genuine overlapped I/O completion (Phase 18) rather than the readiness-emulation model this
+reactor's plain reads/writes otherwise use — `TransmitFile` with `lpOverlapped == NULL` runs fully
+synchronously regardless of a socket's blocking mode, so a real completion was the only option that
+doesn't block a reactor thread. Measured on this machine: ~5× faster large-file throughput than the
+generic read/write fallback it replaces (`CLAUDE.md`'s Phase 18 log has the full numbers and design
+story, including why this didn't require redesigning `io_context`/`async_socket` around a native
+completion model).
+
 ## Benchmarks
 
 Static-file throughput was measured against nginx 1.24, Apache 2.4.58 (event MPM), and a plain
@@ -341,9 +351,10 @@ how many connections arrive, unlike nginx's worker processes, Apache's threaded 
 own multi-worker reactor; a fair Node.js comparison at this concurrency would need the `cluster`
 module or a multi-process reverse-proxy setup, deliberately out of scope for "how fast is one
 plain server process." The full account, including what was tried and reverted along the way and
-why, lives in `CLAUDE.md`'s Phase 16 log; `PLAN.md` tracks only what's still open (a Windows
-equivalent of the sendfile path, and revisiting a couple of specific questions with real
-`perf`-based profiling now that a host to run it on exists).
+why, lives in `CLAUDE.md`'s Phase 16 log. A Windows equivalent of this fast path (via
+`TransmitFile`, over a real overlapped completion) shipped in Phase 18 — see the Windows section
+below and `CLAUDE.md`'s phase log for the design and a real ~5× throughput measurement on that
+platform. `PLAN.md` currently tracks no open performance items.
 
 ### Docker network-stack benchmark
 

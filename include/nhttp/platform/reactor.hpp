@@ -44,6 +44,16 @@ namespace nhttp::platform {
 		virtual int wait(ready_event* out_events, int max_events, int timeout_ms) noexcept = 0;
 
 		virtual void wake() noexcept = 0;
+
+		/* Windows only: the underlying IOCP HANDLE, so async code can associate
+		 * a socket for a genuine overlapped completion (currently only
+		 * TransmitFile — see async_socket::send_file's Windows branch and
+		 * CLAUDE.md's phase log for why this needed a real completion, not
+		 * just the readiness emulation every other operation here uses).
+		 * nullptr on POSIX, where nothing needs it. Deliberately not part of
+		 * the readiness-multiplexing contract above — this is a narrow,
+		 * additive escape hatch for one fast path, not a redesign of it. */
+		virtual void* native_completion_port() noexcept { return nullptr; }
 	};
 
 	/* constructs the platform's reactor implementation. */

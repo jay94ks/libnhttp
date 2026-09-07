@@ -96,6 +96,10 @@ namespace nhttp::async {
 		 */
 		schedule_awaiter schedule() noexcept { return schedule_awaiter{ *this }; }
 
+		/* Windows only (nullptr on POSIX) — see platform::reactor::
+		 * native_completion_port()'s doc comment. */
+		void* native_completion_port() noexcept { return reactor_->native_completion_port(); }
+
 	private:
 		void update_interest(io_registration& reg) const;
 		void add_timer(std::chrono::steady_clock::time_point deadline, std::coroutine_handle<> h);

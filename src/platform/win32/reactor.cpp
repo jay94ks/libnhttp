@@ -1,5 +1,6 @@
 #include "nhttp/platform/reactor.hpp"
 #include "wsa_init.hpp"
+#include "overlapped_op.hpp"
 
 #include <winsock2.h>
 #include <mswsock.h>
@@ -7,6 +8,7 @@
 #include <memory>
 #include <stdexcept>
 #include <unordered_map>
+#include <vector>
 
 namespace nhttp::platform {
 
@@ -142,12 +144,20 @@ namespace nhttp::platform {
 				int produced = 0;
 				DWORD wait_ms = timeout_ms < 0 ? INFINITE : static_cast<DWORD>(timeout_ms);
 
+				// genuine overlapped completions (TransmitFile) dequeued below are
+				// collected here and resumed only after the loop below returns —
+				// same deferred-resume shape process_ready_events() already gives
+				// the ordinary readiness path, so a resumed coroutine registering
+				// new interest (or closing its socket) can never observe this
+				// loop, `states_`, or `produced` in a half-updated state.
+				std::vector<win32_detail::overlapped_op*> to_resume;
+
 				while (produced < max_events) {
 					DWORD bytes = 0;
 					ULONG_PTR key = 0;
 					OVERLAPPED* ov = nullptr;
 
-					::GetQueuedCompletionStatus(port_, &bytes, &key, &ov, wait_ms);
+					const BOOL ok = ::GetQueuedCompletionStatus(port_, &bytes, &key, &ov, wait_ms);
 					wait_ms = 0; // only the first iteration may block; the rest just drain.
 
 					if (ov == nullptr)
@@ -155,6 +165,16 @@ namespace nhttp::platform {
 
 					if (ov == &wake_ov_)
 						continue; // wake sentinel, never surfaced as a ready_event.
+
+					if (key == 0) {
+						// a real overlapped completion, not one of our own
+						// synthetic readiness signals — see overlapped_op.hpp.
+						auto* op = static_cast<win32_detail::overlapped_op*>(ov);
+						op->bytes_transferred = bytes;
+						op->error = ok ? 0 : ::GetLastError();
+						to_resume.push_back(op);
+						continue;
+					}
 
 					auto* st = reinterpret_cast<socket_state*>(key);
 
@@ -177,11 +197,20 @@ namespace nhttp::platform {
 					out.writable = writable;
 				}
 
+				for (win32_detail::overlapped_op* op : to_resume) {
+					if (op->waiter)
+						op->waiter.resume();
+				}
+
 				return produced;
 			}
 
 			void wake() noexcept override {
 				::PostQueuedCompletionStatus(port_, 0, 0, &wake_ov_);
+			}
+
+			void* native_completion_port() noexcept override {
+				return port_;
 			}
 
 		private:

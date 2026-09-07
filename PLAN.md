@@ -10,30 +10,11 @@ are in `ReadMe.md`'s Benchmarks section. Check those first for history — this 
 
 ## Open
 
-- **Windows: a `sendfile(2)` equivalent for static-file responses.** The Linux fast path (see
-  `CLAUDE.md`'s Phase 16 log) has no Windows counterpart yet — `platform::socket_handle::
-  supports_send_file()` returns `false` there, so every response falls back to the generic
-  read/write path. `TransmitFile` is the natural fit, but needs real overlapped-I/O completion
-  handling this reactor's plain reads/writes don't currently use; do this once that's designed and
-  verifiable, not as a quick add-on.
-- **Real `perf`-based profiling, now that a host to run it on exists.** Phase 16's blocker (no
-  matching `linux-tools` package for this WSL2 kernel) no longer holds — `perf stat` and
-  `perf record -g` both work here now (userspace symbols resolve fine; kernel symbols still
-  don't, which doesn't matter for profiling this codebase's own code). Phase 17 used it for the
-  router item below, but the two specific questions Phase 16 could only settle by A/B benchmarking
-  are still open to revisit with a real profile: coroutine-frame allocation churn (P3, reverted
-  for lack of a measured win) and finer-grained `thread_pool` tuning beyond "don't over-provision
-  workers" (P4) — both in `CLAUDE.md`'s Phase 16 log.
-- **`route::method_targets_`'s string-keyed lookup.** The two more impactful parts of this same
-  item (the `route_state` capture map and the per-candidate predicate allocation) were fixed in
-  Phase 17 (see `CLAUDE.md`'s phase log) after `perf`-profiling `benchmark/router/
-  bench_router_main.cpp` confirmed both as real hotspots. This third, always-lower-priority part
-  is still open: `route::method_targets_` is a `std::map<std::string, target_ptr>` keyed by method
-  *name string*, looked up once per matched request via `get_target()` — cheaper than the other
-  two since it's O(1) per request instead of paid per trie node visited during backtracking, but
-  still a string-comparing tree lookup where `protocol::http_method` has no cheaper identity to
-  key on today. Worth a small enum/id addition to `protocol::http_method` if this is ever measured
-  as worth it — `bench_router_main.cpp` now exists as the baseline to A/B it against.
+Nothing right now — Phase 18 (see `CLAUDE.md`'s phase log) closed out every item this file was
+tracking: the Windows `TransmitFile`-based `sendfile(2)` equivalent, the real `perf`-based revisit
+of P3/P4, and `route::method_targets_`'s string-keyed lookup. Check `CLAUDE.md`'s phase log for the
+full story of each and `ReadMe.md`'s Benchmarks section for headline numbers before starting new
+performance work here.
 
 ## Explicitly out of scope
 

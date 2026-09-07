@@ -87,25 +87,29 @@ namespace nhttp::platform {
 		std::int64_t read(void* buf, std::size_t n) const noexcept;
 		std::int64_t write(const void* buf, std::size_t n) const noexcept;
 
-		/* true if send_file() below actually does a kernel-level zero-copy
-		 * send on this platform — a real capability check (like
-		 * set_reuse_port()'s), not a guess. Linux: yes, via sendfile(2).
-		 * Windows: not yet (see PLAN.md's P1 — TransmitFile needs the
-		 * overlapped-I/O completion model this reactor deliberately doesn't
-		 * use for plain reads/writes; CLAUDE.md's Phase 12 design note).
-		 * Callers must check this before calling send_file() and fall back to
-		 * a plain read/write loop when it's false. */
+		/* true if this platform has a kernel-level zero-copy file-to-socket
+		 * send available — a real capability check (like set_reuse_port()'s),
+		 * not a guess. Linux: yes, via sendfile(2), exposed synchronously
+		 * below. Windows: yes too, via TransmitFile, but that needs a real
+		 * overlapped completion (lpOverlapped == NULL runs it fully
+		 * synchronously regardless of socket blocking mode — not a would-
+		 * block/retry fit), so it's exposed through async_socket::send_file's
+		 * Windows branch instead of through this synchronous function — see
+		 * that function and CLAUDE.md's phase log for the design. Callers
+		 * must check this before relying on the fast path being real, but
+		 * should call `async_socket::send_file` either way (it dispatches to
+		 * whichever backing implementation this platform actually has). */
 		static bool supports_send_file() noexcept;
 
-		/* sends up to `count` bytes from the regular file `in_fd` (a raw
-		 * POSIX fd — see io::file_stream::native_fd()) to this socket,
-		 * starting at `offset`, which is advanced by the number of bytes
-		 * actually sent (same contract as POSIX sendfile(2), which this
-		 * wraps directly). Returns bytes sent (>= 0, possibly a short send
-		 * under backpressure — retry with the advanced offset, exactly like
-		 * write()), or -1 on error/would-block (check would_block()/
-		 * last_socket_error()). Only meaningful when supports_send_file() is
-		 * true; must not be called otherwise. */
+		/* POSIX only in practice (see supports_send_file()'s comment for why
+		 * Windows' equivalent lives elsewhere): sends up to `count` bytes from
+		 * the regular file `in_fd` (a raw POSIX fd — see io::file_stream::
+		 * native_fd()) to this socket, starting at `offset`, which is advanced
+		 * by the number of bytes actually sent (same contract as POSIX
+		 * sendfile(2), which this wraps directly). Returns bytes sent (>= 0,
+		 * possibly a short send under backpressure — retry with the advanced
+		 * offset, exactly like write()), or -1 on error/would-block (check
+		 * would_block()/last_socket_error()). */
 		std::int64_t send_file(int in_fd, std::int64_t& offset, std::size_t count) const noexcept;
 
 		bool shutdown_both() const noexcept;

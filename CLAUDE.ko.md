@@ -884,6 +884,120 @@ ctest --test-dir build-win --output-on-failure
       시나리오에서 따로 기록해둔 RSS/메모리 안정성 수치는 이번 라운드에 **다시 측정하지
       않았고**, 이번 실행의 요청 수와 엮인 것으로 잘못 읽히지 않도록 원래 Phase 16의 3자
       비교 실행에서 나온 것이라고 `ReadMe.md`/`ReadMe.ko.md`에 명시해뒀습니다.
+- **Phase 18(PLAN.md에 남아 있던 모든 것 마무리) — 완료.** Phase 17 다음에 PLAN.md의 남은 열린
+  항목들을 마저 구현해달라는 사용자의 명시적 요청에 따른 것입니다. 이걸로 PLAN.md가 추적하던
+  항목이 전부 끝났습니다 — 성능 관련해서 거기 더 이상 열려 있는 게 없습니다(아래 참고).
+  - **`route::method_targets_`의 문자열 키 조회** (Phase 17이 끝날 때 남겨둔, router 항목의 늘
+    우선순위 낮았던 세 번째 부분): `route_state::captures`를 고쳤던 것과 같은 방식으로
+    고쳤습니다 — `protocol::http_method`가 저렴한 `http_method_id` enum을 갖게 됐고
+    (`custom` 하나에 알려진 메서드마다 값 하나씩, `known_methods` 테이블에서 `flags_`와 함께
+    생성자 안에서 계산됨), `route::method_targets_`는 이제 `std::map<std::string, target_ptr>`
+    대신 작은 평평한 `std::vector<method_target_entry>`(`{id, name, target}`)입니다 —
+    `get_target()`/`set_target()`은 `id`를 먼저 비교하고(평범한 정수 비교, 알려진 9개 메서드
+    전부의 고속 경로) `id == custom`일 때만 `name`을 비교하는데, 이게 바로 서로 다른 두
+    커스텀/WebDAV 스타일 메서드를 구별하는 데 실제로 필요한 유일한 경우입니다(id만으로는 구별할
+    수 없는 유일한 케이스). 어떤 호출부의 동작도 바뀌지 않았습니다 — `has_any_target()`/
+    `get_target()`의 공개 계약은 그대로고, 내부 저장 방식만 바뀌었습니다. 확인: 리눅스 119/119,
+    Windows 115/115, 둘 다 경고 없이 통과.
+  - **P3/P4(Phase 16의 두 열린 질문)를 실제 `perf`로 다시 살펴봄**: `benchmark/docker/nhttp/
+    bench_main.cpp`(정적 파일 `sendfile(2)` 경로)를 Phase 17이 router를 프로파일링했던 것과
+    같은 방식으로 프로파일링했습니다 — `wrk` 부하 아래 `perf record -g`. 결과, 그리고 둘 다
+    코드 변경으로 이어지지 않은 이유:
+    - **`thread_pool` 오버헤드는 작고, 프로파일에도 작게 나타남**: `worker_loop()` + `enqueue()`
+      + `pthread_mutex_lock`/`unlock`을 합쳐도 샘플링된 CPU 시간의 2% 미만이었습니다. 이는 P4의
+      튜닝(Phase 16)이 여전히 유효함을 확인해줍니다 — 실제 프로파일에서도 더 튜닝할 여지가
+      보이지 않는데, A/B만으로 얻은 증거가 이미 시사하던 바와 같습니다.
+    - **고칠 만한 집중된 "코루틴 프레임 할당" 핫스팟은 없음**: 전체 할당자 오버헤드(`malloc`/
+      `cfree`/`_int_malloc`/`_int_free`/`operator new`/`operator delete`)는 실제로 샘플의 약
+      8%였지만, 호출자 그래프로 보면 이게 여러 곳에 퍼져 있었습니다 — 평범한 요청당
+      `std::string`/`std::vector` 할당(헤더 벡터, `http_headers::set`, `stat_file`/`printf`
+      스타일 포매팅)이 코루틴 프레임이 쓰는 것과 같은 `operator new`/`delete` 심볼을 거치는데,
+      그중에서 프레임 할당이 유독 더 큰 비용이라고 구별해낼 만한 게 없었습니다. 이는 P3의
+      Phase 16 결과(커스텀 코루틴 프레임 할당자가 측정 가능한 개선을 보이지 않음)에 대한
+      실제 데이터 기반 설명입니다: 프레임 할당 비용 자체가, 이미 무관한 여러 호출부에 퍼져
+      있는 비용들과 같은 크기 등급이라서, 그것만 따로 최적화해도 바늘을 움직일 만큼 집중돼
+      있지 않다는 것입니다. 코드 변경은 없었습니다; 이걸로 Phase 16이 A/B로만 답할 수밖에
+      없었던 질문이 마무리됐습니다.
+  - **Windows: 진짜 `TransmitFile` 기반 `sendfile(2)` 대응물** (PLAN.md에서 가장 오래 열려 있던
+    항목으로, 정확히 이런 설계/검증 작업이 있을 때까지 미뤄뒀던 것입니다). 이 항목 자신의 글이
+    지목했던 핵심 걸림돌 — TransmitFile에는 진짜 오버랩드 완료가 필요한데, 이 리액터의 평범한
+    읽기/쓰기는 일부러 그걸 안 쓴다는 것 — 을 추측이 아니라 실제로 확인했습니다: 마이크로소프트
+    자체 문서에 `TransmitFile(..., lpOverlapped = NULL, ...)`은 **소켓의 논블로킹 모드와
+    무관하게 항상 완전히 동기적으로 실행된다**("the operation is executed as synchronous I/O...
+    will not complete until the file has been sent")고 나와 있습니다 — 그러니 바라던 지름길
+    (`write()`처럼 호출하고 `WSAEWOULDBLOCK`을 똑같이 취급하는 것)은 존재하지 않고, 리액터
+    스레드를 블로킹하지 않는 유일한 선택지는 진짜 오버랩드 완료뿐입니다. PLAN.md가 짐작했던
+    그대로입니다.
+    - **설계, 일부러 좁게 유지함**: `io_context`/`async_socket`을 네이티브 완료 모델 중심으로
+      다시 설계하는 대신(명시적으로 범위 밖 — PLAN.md 자신의 "명시적으로 제외되는 것" 목록과
+      Phase 12의 설계 노트가 그 이유를 설명함), `iocp_reactor`가 이미 갖고 있는 *기존* IOCP
+      포트를 재사용하는 작고, 추가적이고, 자체 완결된 메커니즘 하나를 얹었습니다:
+      - `platform::reactor`가 non-pure virtual 하나(`native_completion_port()`, 기본값
+        `nullptr`; POSIX의 `epoll_reactor`는 오버라이드할 필요 없음)를 얻었고, `io_context`가
+        그걸 그대로 노출합니다. 이게 일반적이고 이식 가능한 리액터 계약에 대한 유일한 변경이고,
+        나머지는 전부 Windows 전용입니다.
+      - 새 internal-only 헤더 `src/platform/win32/overlapped_op.hpp`(이 디렉터리의
+        `sockaddr_convert.hpp`와 같은 "설치되지 않음" 상태)는 `std::coroutine_handle<> waiter`와
+        바이트/에러 결과를 담은 `overlapped_op : OVERLAPPED`를 정의합니다 — 실제 오버랩드
+        연산을 발행하는 쪽(`async_socket::send_file`의 새 Windows 분기)과 완료를 드레인하는 쪽
+        (`iocp_reactor::wait()`)이 공유하는 계약입니다.
+      - `iocp_reactor::wait()`의 `GetQueuedCompletionStatus` 루프가 새 분기 정확히 하나를
+        얻었습니다: 완료 키가 `0`이면 진짜 오버랩드 완료(TransmitFile)이지, 리액터 자신의
+        합성된 준비성 신호(늘 살아있는 `socket_state*`를 키로 쓰고, 절대 null이 아님)가
+        아닙니다 — `ov`를 `overlapped_op*`로 캐스트해서 결과를 기록하고 그 waiter를 재개합니다.
+        재개는 `wait()`가 반환하기 직전에 드레인하는 작은 로컬 벡터로 미뤄지는데(이미 확립된
+        `io_context::process_ready_events()`의 "루프 도는 동안 모아뒀다가 wait()가 반환한
+        뒤에야 재개" 방식을 그대로 따른 것), 루프 중간에 곧바로 재개하지 않는 이유는, 재개된
+        코루틴이 새 관심을 등록하거나 자기 소켓을 닫아도 `wait()` 자신의 루프 상태(`states_`,
+        `produced`)를 절반만 갱신된 채로 절대 관찰할 수 없게 하기 위해서입니다.
+      - `async_socket::send_file`의 Windows 분기(`src/async/socket.cpp`)가 실제 `TransmitFile`
+        호출을 발행합니다: `CreateIoCompletionPort`로 소켓을 포트에 연결하는데 — 매 `send_file`
+        마다 무조건 호출하고, 소켓별로 "이미 연결됐음"을 추적하지 않습니다. 이미 연결된 핸들에
+        두 번째로 호출하면 그냥 별 탈 없이 실패하고 값싼 커널 호출 하나만 더 드는데, 이게
+        재사용된 `SOCKET` 값에 키를 건 소켓별 캐시가 오래된 정보를 가질 수 있는 것보다 더
+        단순하고 절대 잘못될 일이 없습니다 — 그다음 프로세스 전역으로 캐싱해둔 함수 포인터를
+        통해 `TransmitFile`을 호출합니다(`WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER)`로 한
+        번만 얻고, 그 멱등적인 캐시 쓰기 자체가 데이터 경합이 되지 않도록 `std::atomic`으로
+        보호). 즉시 `TRUE`가 반환되든 `FALSE`+`WSA_IO_PENDING`이 반환되든 여전히 코루틴을
+        suspend하고 `iocp_reactor::wait()`가 완료를 전달해주길 기다립니다(포트에 연결된
+        핸들은 `FILE_SKIP_COMPLETION_PORT_ON_SUCCESS`를 설정하지 않는 한 — 여기선 아무 데도
+        설정하지 않음 — 어느 쪽이든 항상 완료가 큐에 들어옵니다) — 진짜 실패일 때만 suspend 없이
+        곧바로 코루틴을 재개합니다.
+      - `io::file_stream::native_fd()` — 이전엔 Windows에서 아무도 호출하지 않아서 그냥
+        하드코딩된 `-1` 스텁이었는데 — 이제 `_fileno()`로 진짜 CRT fd를 반환합니다;
+        `async_socket::send_file`의 Windows 분기가 `TransmitFile`이 필요로 하는 바로 그 지점에서
+        `_get_osfhandle()`로 그걸 Win32 `HANDLE`로 직접 변환합니다 — `native_fd()`의 크로스
+        플랫폼 계약(raw OS 핸들이 아니라 CRT 스타일 fd)이 POSIX에서의 의미와 일관되게 유지됩니다.
+    - **컴파일만이 아니라 검증까지**: 두 플랫폼 모두 전체 스위트가 경고 없이 통과합니다
+      (리눅스 119/119, Windows 115/115) — 기존 정적 파일 통합 테스트들이 처음으로 이 경로를
+      실제로 타면서(`supports_send_file()`이 `true`로 바뀜) 그대로 통과했습니다. 그에 더해,
+      Phase 9/Phase 11이 플랫폼 특화 작업에 남긴 선례와 똑같이 수동으로 스모크 테스트했습니다:
+      네이티브 Windows에서 실제로 돌아가는 `examples/nhttpd` 인스턴스로, 작은 텍스트 파일과
+      2&nbsp;MiB 바이너리 파일(새 경로를 거쳐 SHA-256이 바이트 단위로 정확히 일치함을 확인)을
+      서빙하고, 바이트 `Range` 요청(206, 올바른 부분 범위 내용 — Phase 16이 만든 mmap/Range
+      경로가 이번 변경에 영향받지 않았음을 확인)을 처리하고, keep-alive로 반복 요청을 처리하고,
+      50개의 동시 전체 파일 다운로드를 크래시 없이 처리한 뒤 마지막 재확인에서도 바이트 단위로
+      정확한 내용을 냈습니다.
+    - **실제 수치**: 네이티브 Windows용 `wrk` 빌드가 없어서, 루프백을 통해 병렬 `curl` 프로세스로
+      50&nbsp;MiB 파일을 16개 동시 다운로드(합계 800&nbsp;MiB)하는 방식으로 측정했고, 이 phase
+      이전의 베이스라인 빌드와 A/B 비교했습니다(`git stash`로 TransmitFile 이전의 깨끗한 트리를
+      얻어서 별도 바이너리로 빌드, 같은 머신, 같은 테스트 파일, 실제 빌드 직전/직후) — 베이스라인
+      약 3.6~3.9초(약 208~222&nbsp;MB/s) 대 이 phase의 빌드 약 0.6~0.8초(약 1.0~1.3&nbsp;GB/s),
+      같은 800&nbsp;MiB에 대해 이 머신에서 실제로 **약 5배**의 처리량 개선입니다. 리눅스
+      벤치마크의 `wrk` 기반 방법론보다는 거칩니다만(`curl` 프로세스 호출마다 드는 프로세스
+      기동 비용이 공짜가 아니고, 이건 작은 파일에 대한 초당 요청 수가 아니라 큰 파일의 순수
+      처리량을 재는 것입니다), sendfile(2)의 리눅스 수치가 이미 보여준 것과 같은 방향의 명확하고
+      실제적이며 재현 가능한 신호입니다.
+    - **알면서도 받아들인 단순화**: `TransmitFile` 호출 한 번으로는 부족할 만큼 큰 파일
+      (`nNumberOfBytesToWrite`는 2&nbsp;GiB 바로 아래인 `0x7FFFFFFE`로 상한선이 있음)을
+      실제로 exercised하는 테스트는 없습니다 — `http1_io.cpp`의 기존 전송 루프가 짧은/부분
+      완료를 이미 진행된 오프셋으로 다시 루프 도는 방식으로 처리하는데(실제 다중 호출 전송이
+      쓸 바로 그 메커니즘입니다), 그래서 이건 그 규모에서 독립적으로 검증됐다기보다는 구조상
+      맞다고 믿는 것입니다 — 그 규모를 여기서 실제로 세팅하는 건 현실적이지 않았습니다.
+  - PLAN.md는 이제 열린 성능 항목이 없습니다 — 이 phase가 Phase 16이 남긴 것과 Phase 17이 아직
+    끝내지 못한 것을 전부 마무리했습니다. 이 저장소의 향후 성능 작업은 깨끗한 `PLAN.md`에서
+    시작합니다(QUIC/HTTP-3 관련이거나 이미 명시적으로 범위 밖으로 기록된 것들은 그대로 별도로
+    추적됩니다).
 - 계획에 남은 것은 QUIC/HTTP-3(보류, 결정 #8 참고), Phase 12가 기록한 Windows에서의 OpenSSL
   빌드 환경 공백, 그리고 PLAN.md가 현재 추적하는 것들뿐입니다. 이 저장소의 향후 작업은
   여기서부터 시작합니다 — 위의 모듈 맵과 빌드 안내, 사용자 대상 API 투어는 `ReadMe.md`,

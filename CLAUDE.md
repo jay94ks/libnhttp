@@ -891,6 +891,116 @@ zero compiler warnings, **on both platforms**, before moving on.
       RSS/memory-stability figures were **not** re-measured this round and are called out in
       `ReadMe.md`/`ReadMe.ko.md` as being from the original Phase 16 three-way run specifically, so
       they're not misread as tied to this run's request counts.
+- **Phase 18 (finishing everything left on PLAN.md) — done**, at the user's explicit request to
+  implement the rest of PLAN.md's open items after Phase 17. This closes out every item PLAN.md was
+  tracking — nothing performance-related is open there anymore (see below).
+  - **`route::method_targets_`'s string-keyed lookup** (the always-lower-priority third part of the
+    router item, left open at the end of Phase 17): fixed the same way `route_state::captures` was —
+    `protocol::http_method` gained a cheap `http_method_id` enum (`custom` plus one value per known
+    method, computed alongside `flags_` in the constructor from the same `known_methods` table), and
+    `route::method_targets_` is now a small flat `std::vector<method_target_entry>` (`{id, name,
+    target}`) instead of `std::map<std::string, target_ptr>` — `get_target()`/`set_target()` compare
+    `id` first (a plain integer, the fast path for all 9 known methods) and only fall back to
+    comparing `name` when `id == custom`, which is what actually disambiguates two different custom/
+    WebDAV-style methods from each other (the only case a bare id can't). No behavior change for any
+    caller — `has_any_target()`/`get_target()`'s public contract is identical, only the internal
+    storage changed. Verified: 119/119 on Linux, 115/115 on Windows, both warning-free.
+  - **Real `perf`-based profiling revisit of P3/P4 (Phase 16's two open questions)**: profiled
+    `benchmark/docker/nhttp/bench_main.cpp` (the static-file `sendfile(2)` path) the same way Phase
+    17 profiled the router — `perf record -g` under `wrk` load. Findings, and why neither led to a
+    code change:
+    - **`thread_pool` overhead is small and profiles as small**: `worker_loop()` + `enqueue()` +
+      `pthread_mutex_lock`/`unlock` together accounted for under 2% of sampled CPU time. This
+      confirms P4's tuning (Phase 16) still holds — no further tuning opportunity is visible in a
+      real profile, matching what the A/B-only evidence already suggested.
+    - **No concentrated "coroutine-frame allocation" hotspot exists to fix**: total allocator
+      overhead (`malloc`/`cfree`/`_int_malloc`/`_int_free`/`operator new`/`operator delete`) was a
+      real ~8% of samples, but a caller-graph view showed it's diffuse — ordinary per-request
+      `std::string`/`std::vector` allocations (the headers vector, `http_headers::set`, `stat_file`/
+      `printf`-style formatting) funnel through the same `operator new`/`delete` symbols coroutine
+      frames use, with nothing distinguishing frame allocation as a separate, larger cost among them.
+      This is a real, data-backed explanation for P3's Phase-16 finding (a custom coroutine-frame
+      allocator measured no win): the frame allocation cost isn't concentrated enough on its own to
+      move the needle even if optimized in isolation, since it's the same size class as costs already
+      spread across many unrelated call sites. No code change made; this closes out the question Phase
+      16 could only answer by A/B.
+  - **Windows: a real `TransmitFile`-based `sendfile(2)` equivalent** (PLAN.md's longest-standing
+    open item, previously deferred pending exactly this design/verification work). The key blocker
+    this item's own text called out — TransmitFile needing a genuine overlapped completion, which
+    this reactor's plain reads/writes deliberately don't use — was confirmed for real (not assumed):
+    Microsoft's own docs state `TransmitFile(..., lpOverlapped = NULL, ...)` **always runs fully
+    synchronously regardless of the socket's non-blocking mode** ("the operation is executed as
+    synchronous I/O... will not complete until the file has been sent") — so the hoped-for shortcut
+    (call it like `write()`, treat `WSAEWOULDBLOCK` the same way) does not exist; a real overlapped
+    completion is the only option that doesn't block a reactor thread, exactly as PLAN.md assumed.
+    - **Design, kept deliberately narrow**: rather than redesigning `io_context`/`async_socket`
+      around a native completion model (explicitly out of scope — PLAN.md's own "explicitly out of
+      scope" list, and Phase 12's design note for why), this adds one small, additive, self-contained
+      mechanism reusing the *existing* IOCP port `iocp_reactor` already owns:
+      - `platform::reactor` gained one non-pure virtual, `native_completion_port()` (default
+        `nullptr`; POSIX's `epoll_reactor` needs no override), and `io_context` exposes it verbatim.
+        This is the only change to the general, portable reactor contract — everything else is
+        Windows-only.
+      - A new internal-only header, `src/platform/win32/overlapped_op.hpp` (same "never installed"
+        status as `sockaddr_convert.hpp` in that directory), defines `overlapped_op : OVERLAPPED`
+        carrying a `std::coroutine_handle<> waiter` plus a bytes/error result — the contract shared
+        between whoever issues a real overlapped op (`async_socket::send_file`'s new Windows branch)
+        and whoever drains completions (`iocp_reactor::wait()`).
+      - `iocp_reactor::wait()`'s `GetQueuedCompletionStatus` loop gained exactly one new branch:
+        a completion whose key is `0` is a genuine overlapped completion (TransmitFile), not one of
+        the reactor's own synthetic readiness signals (which always key on a live `socket_state*`,
+        never null) — cast `ov` to `overlapped_op*`, record its result, and resume its waiter.
+        Resumption is deferred to a small local vector drained just before `wait()` returns (mirroring
+        `io_context::process_ready_events()`'s already-established "collect during the loop, resume
+        only after wait() returns" shape) rather than resuming inline mid-loop, so a resumed
+        coroutine registering new interest or closing its socket can never observe `wait()`'s own loop
+        state (`states_`, `produced`) half-updated.
+      - `async_socket::send_file`'s Windows branch (`src/async/socket.cpp`) issues the actual
+        `TransmitFile` call: associates the socket with the port via `CreateIoCompletionPort` —
+        called unconditionally on every `send_file`, not tracked as "already associated" per-socket,
+        since a second call on an already-associated handle just fails harmlessly and costs one cheap
+        kernel call, which is simpler and can't go stale the way a per-socket cache keyed on a
+        reused `SOCKET` value could — then calls `TransmitFile` through a process-cached function
+        pointer (obtained once via `WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER)`, `std::atomic`-
+        guarded so the idempotent cache write itself isn't a data race). Both an immediate `TRUE`
+        return and `FALSE`+`WSA_IO_PENDING` still suspend the coroutine and wait for
+        `iocp_reactor::wait()` to deliver the completion (a handle associated with a port always gets
+        one queued either way, unless `FILE_SKIP_COMPLETION_PORT_ON_SUCCESS` was set, which nothing
+        here does) — only a genuine failure resumes the coroutine immediately without suspending.
+      - `io::file_stream::native_fd()` — previously a hardcoded `-1` stub on Windows, since nothing
+        called it there — now returns a real CRT fd via `_fileno()`; `async_socket::send_file`'s
+        Windows branch converts that to a Win32 `HANDLE` itself via `_get_osfhandle()`, right where
+        `TransmitFile` needs it, keeping `native_fd()`'s cross-platform contract (a CRT-style fd,
+        not a raw OS handle) consistent with its POSIX meaning.
+    - **Verified, not just compiled**: full suite green on both platforms (119/119 Linux, 115/115
+      Windows, warning-free) — the existing static-file integration tests now exercise this path for
+      the first time (`supports_send_file()` flipped `true`) and passed unchanged. Beyond that,
+      manually smoke-tested exactly like Phase 9's/Phase 11's precedent for platform-specific work:
+      a real `examples/nhttpd` instance on native Windows, serving a small text file and a 2&nbsp;MiB
+      binary file (SHA-256 verified byte-exact through the new path), a byte-`Range` request (206,
+      correct sub-range content — confirming the mmap/Range path Phase 16 built is untouched by this
+      change), repeated keep-alive requests, and 50 concurrent full-file downloads with no crash and
+      byte-exact content on a final re-check afterward.
+    - **Real numbers**: no `wrk` build exists for native Windows, so this was measured with 16
+      concurrent downloads of a 50&nbsp;MiB file (800&nbsp;MiB total) over loopback via parallel
+      `curl` processes, A/B'd against a baseline build from before this phase (`git stash` to get a
+      clean pre-TransmitFile tree, built to a separate binary, same machine, same test files,
+      immediately before/after the real build) — baseline ~3.6-3.9s (~208-222&nbsp;MB/s) vs. this
+      phase's build ~0.6-0.8s (~1.0-1.3&nbsp;GB/s) for the same 800&nbsp;MiB, a real **~5×**
+      throughput improvement on this machine. Cruder than the Linux benchmark's `wrk`-based
+      methodology (process-spawn overhead per `curl` invocation isn't free, and this measures
+      raw large-file throughput rather than requests/sec on small files), but a clear, real,
+      reproducible signal in the same direction sendfile(2)'s Linux numbers already showed.
+    - **Known, deliberately accepted simplification**: no test exercises a file large enough to
+      require more than one `TransmitFile` call (`nNumberOfBytesToWrite` is capped at
+      `0x7FFFFFFE`, just under 2&nbsp;GiB) — `http1_io.cpp`'s existing send-loop already handles a
+      short/partial completion by looping with the advanced offset (the exact mechanism a real
+      multi-call transfer would use), so this is believed correct by construction rather than
+      independently verified at that scale, which wasn't practical to set up here.
+  - PLAN.md is now empty of open performance items — this phase closes out every one Phase 16 left
+    behind and everything Phase 17 didn't already finish. Future performance work on this repo starts
+    from a clean `PLAN.md` (still tracked separately from anything QUIC/HTTP-3-related or already
+    listed as explicitly out of scope, both unchanged from before).
 - Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8), Phase 12's noted
   OpenSSL-on-Windows build-environment gap, and whatever `PLAN.md` currently tracks as open.
   Future work on this repo starts from here — see the module map and build instructions above,
