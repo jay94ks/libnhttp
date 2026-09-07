@@ -4,6 +4,23 @@
 #include "nhttp/protocol/http_mime_type.hpp"
 #include "nhttp/io/file_stream.hpp"
 
+namespace {
+
+	/* same wants()-then-handle() stat-caching tradeoff as overlay's
+	 * resolve_cache (see its doc comment and PLAN.md's P2), and the same
+	 * `owner` guard for the same reason: multiple single_file instances can be
+	 * mounted on one listener, each at a different fixed path, and the tag
+	 * slot below is keyed only by C++ type — not by which instance wrote it —
+	 * so a cache left by one instance's wants() (which returned false and was
+	 * never handle()'d) must never be mistaken for another instance's result. */
+	struct stat_cache {
+		const void* owner = nullptr;
+		bool computed = false;
+		std::optional<nhttp::platform::file_info> value;
+	};
+
+}
+
 namespace nhttp::server {
 
 	single_file::single_file(std::string path, async::thread_pool& pool,
@@ -13,12 +30,18 @@ namespace nhttp::server {
 	}
 
 	async::task<std::optional<platform::file_info>> single_file::stat_file(request& req) const {
+		stat_cache& cache = req.tags.ensure<stat_cache>();
+
+		if (cache.computed && cache.owner == this)
+			co_return cache.value;
+
+		cache.owner = this;
+		cache.computed = true;
+
 		const platform::file_info info = co_await pool_->run(*req.io_ctx, [this] { return platform::stat_file(path_); });
 
-		if (info.kind != platform::file_kind::regular_file)
-			co_return std::nullopt;
-
-		co_return info;
+		cache.value = (info.kind == platform::file_kind::regular_file) ? std::optional(info) : std::nullopt;
+		co_return cache.value;
 	}
 
 	async::task<bool> single_file::wants(request& req) {
@@ -34,7 +57,7 @@ namespace nhttp::server {
 		if (!info)
 			co_return make_response(404);
 
-		std::unique_ptr<io::file_stream> file = co_await io::file_stream::open(*req.io_ctx, *pool_, path_, "rb");
+		std::unique_ptr<io::file_stream> file = co_await io::file_stream::open(*req.io_ctx, *pool_, path_, "rb", info->size);
 
 		if (!file)
 			co_return make_response(404);

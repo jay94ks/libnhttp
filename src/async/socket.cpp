@@ -81,6 +81,25 @@ namespace nhttp::async {
 		}
 	}
 
+	task<std::size_t> async_socket::send_file(int in_fd, std::int64_t& offset, std::size_t count) {
+		for (;;) {
+			const std::int64_t r = handle_.send_file(in_fd, offset, count);
+
+			if (r >= 0)
+				co_return static_cast<std::size_t>(r);
+
+			if (platform::would_block()) {
+				co_await wait_writable();
+				continue;
+			}
+
+			if (platform::was_interrupted())
+				continue;
+
+			throw std::system_error(platform::last_socket_error(), std::generic_category(), "send_file: " + platform::describe_socket_error(platform::last_socket_error()));
+		}
+	}
+
 	task<async_socket> async_socket::accept() {
 		for (;;) {
 			auto accepted = handle_.accept();

@@ -14,6 +14,7 @@ list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 set(NHTTP_UNIT_TEST_SOURCES
 	unit/test_version.cpp
 	unit/test_task.cpp
+	unit/test_mpmc_queue.cpp
 	unit/test_platform_socket.cpp
 	unit/test_io_context.cpp
 	unit/test_thread_pool.cpp

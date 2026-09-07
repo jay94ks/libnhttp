@@ -35,4 +35,4 @@ COPY --from=build /tmp/nhttp_bench_server /usr/local/bin/nhttp_bench_server
 COPY benchmark/docker/content/ /srv/www/
 
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/nhttp_bench_server", "/srv/www", "8080", "64"]
+ENTRYPOINT ["/usr/local/bin/nhttp_bench_server", "/srv/www", "8080"]

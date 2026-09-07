@@ -14,7 +14,14 @@ if(MSVC)
 	# every non-ASCII character (em-dashes, arrows, etc. throughout comments)
 	# trips C4819 — fatal under /WX. Found while bringing up the first native
 	# Windows build; see CLAUDE.md's Windows-support notes.
-	set(NHTTP_WARNING_FLAGS /W4 /permissive- /utf-8)
+	# /wd4324 ("structure was padded due to alignment specifier") is a
+	# deliberate, working-as-intended pattern in
+	# include/nhttp/async/detail/mpmc_queue.hpp (PLAN.md's P4): its enqueue/
+	# dequeue position counters are each `alignas(64)`'d specifically to land
+	# on separate cache lines and avoid false sharing between producer and
+	# consumer threads — the padding C4324 flags *is* the point, not an
+	# accident to fix. GCC/Clang have no equivalent warning for this pattern.
+	set(NHTTP_WARNING_FLAGS /W4 /permissive- /utf-8 /wd4324)
 
 	if(NHTTP_WARNINGS_AS_ERRORS)
 		list(APPEND NHTTP_WARNING_FLAGS /WX)

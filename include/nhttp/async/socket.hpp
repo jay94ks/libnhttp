@@ -42,6 +42,12 @@ namespace nhttp::async {
 		task<async_socket> accept();
 		task<bool> connect(const platform::endpoint& ep);
 
+		/* the sendfile(2) fast path (see PLAN.md's P1) — same would-block/
+		 * retry contract as write_some(), just backed by
+		 * platform::socket_handle::send_file() instead of write(). Only call
+		 * this when platform::socket_handle::supports_send_file() is true. */
+		task<std::size_t> send_file(int in_fd, std::int64_t& offset, std::size_t count);
+
 	private:
 		struct read_ready_awaiter {
 			async_socket& sock;

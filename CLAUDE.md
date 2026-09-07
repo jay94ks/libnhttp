@@ -766,11 +766,66 @@ zero compiler warnings, **on both platforms**, before moving on.
     several times — stat, open, size, read, close — where nginx uses one zero-copy `sendfile()`
     call), not a bug, and not addressed in this phase. See [PLAN.md](PLAN.md) for the prioritized
     plan to close it, written directly from what this benchmarking round found.
+- **Phase 16 (executing PLAN.md — P1 through P5) — done.** At the user's explicit request to
+  execute everything PLAN.md proposed, including two items (P3, and P4's later iterations) whose
+  own text said not to attempt them without profiling data the user asked for anyway. Full
+  results, numbers, and reproduction steps are in `ReadMe.md`'s Benchmarks section and `PLAN.md`
+  itself (each item's entry there was rewritten in place to record what actually happened, not
+  left as a stale plan next to a separate "here's what we did" log) — this entry is the short
+  version plus anything not already covered there.
+  - **Combined result**: loopback 13.8K → 58.0K req/s (~4.2×), Docker network-stack benchmark
+    11.2K → 35.9K req/s (~3.2×) — nhttpd now beats Apache in both and closes most of the remaining
+    gap to nginx (roughly half its throughput on loopback, two-thirds in Docker, up from a tenth
+    and a sixth respectively).
+  - **P1 (`sendfile(2)` fast path) and P2 (fewer thread-pool round trips)** landed together;
+    `io::file_stream` gained `native_fd()`, `platform::socket_handle` gained `send_file()`/
+    `supports_send_file()` (Windows correctly reports `false` — `TransmitFile` needs the real
+    IOCP completion model this reactor's plain reads/writes deliberately don't use, a risk not
+    worth taking without being able to verify the overlapped-completion edge cases as rigorously
+    as everything else here), and `overlay`/`single_file` stopped double-`stat()`ing a request
+    between `wants()` and `handle()`.
+  - **P3 (a custom coroutine-frame allocator) was implemented, benchmarked, and reverted** — no
+    measurable win over glibc's own `tcache`, which already does almost exactly the same thing.
+    `include/nhttp/async/task.hpp` is back to exactly the Phase 15 fix, nothing more.
+  - **P4 (`thread_pool`'s job queue) went through three real iterations, not one**, and is the
+    most instructive result in this phase: a `std::counting_semaphore`-based lock-free queue
+    measured *~2× slower*; a lock-free queue paired with a plain mutex+condvar used only to wake
+    idle workers fixed that, but only once `blocking_pool_size` stopped being deliberately
+    over-provisioned — at the large pool size (64) this document's own earlier tuning advice
+    recommended, 64 threads contending over this machine's 8 CPU cores lost far more to
+    context-switch overhead than the lock-free queue saved (confirmed directly: the *old*
+    mutex+`std::queue` design got *faster* going from pool size 64 to 8, the lock-free design got
+    *slower* the same direction — opposite trends, both real); at the library's own untouched
+    default (`blocking_pool_size` = 4) it hit ~69K req/s, the best result of the whole phase.
+    `blocking_pool_size` needs no manual tuning at all now — a complete reversal of what this repo
+    used to recommend. A follow-up simplification (dropping an atomic "is anyone waiting" gate
+    around the wake notification, since glibc's `condition_variable::notify_one()` already skips
+    its own futex-wake syscall when nothing is waiting) measured equivalent and was kept for the
+    simpler code. Added `include/nhttp/async/detail/mpmc_queue.hpp` (Dmitry Vyukov's bounded MPMC
+    design) with its own dedicated stress test (`tests/unit/test_mpmc_queue.cpp` — 8 producers ×
+    4 consumers × 20,000 items each through a deliberately undersized queue, checking every item
+    delivered exactly once) verified clean under ThreadSanitizer alongside the full suite, for
+    every iteration, before any of them were benchmarked.
+  - **P5 (a windowed, memory-mapped file read path)** added `platform::file_mapping` — bounded to
+    a 4&nbsp;MiB sliding window rather than ever mapping an entire file (a multi-gigabyte file
+    mapped whole just to serve a small byte-`Range` request would waste address space/page-table
+    setup at best, exhaust it outright on a 32-bit target at worst). The mapping is opened
+    *lazily*, on a stream's first actual `read()` call, not eagerly in `open()` — an eager version
+    was tried first and measurably regressed the common whole-file-GET case, which never calls
+    `read()` at all once P1's sendfile path exists, by paying for a mapping that request would
+    never use.
+  - **A real anomaly noticed and corrected during this phase, unrelated to the work itself**: two
+    files unrelated to this session's changes (`.gitignore`, `LICENSE`) and one legacy benchmark
+    asset (`benchmark/benchmark-1.jmx`) picked up a line-ending-only (LF→CRLF) diff as a side
+    effect of a `git stash`/`stash pop` round trip used to A/B-test P4's design against the
+    pre-P4 baseline. No content changed. Reverted via `git checkout` before committing rather than
+    carried along as unrelated noise.
 - Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8), Phase 12's noted
-  OpenSSL-on-Windows build-environment gap, and Phase 15's performance-improvement plan
-  ([PLAN.md](PLAN.md)). Future work on this repo starts from here — see the module map and build
-  instructions above, `ReadMe.md` for the user-facing API tour, and `PLAN.md` for what's next on
-  performance specifically.
+  OpenSSL-on-Windows build-environment gap, and whatever `PLAN.md` records as still open after
+  Phase 16 (P5's own entry there notes a couple of narrower follow-ups — Windows `TransmitFile`
+  for P1, and profiling P3/P4-adjacent questions properly on a host that can actually run `perf`).
+  Future work on this repo starts from here — see the module map and build instructions above,
+  `ReadMe.md` for the user-facing API tour, and `PLAN.md` for the full performance-work record.
 
 ## Working style notes for this repo specifically
 

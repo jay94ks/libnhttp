@@ -1,9 +1,38 @@
 #include "nhttp/server/http1_io.hpp"
 #include "nhttp/protocol/http_chunked.hpp"
+#include "nhttp/io/file_stream.hpp"
 #include "nhttp/io/memory_stream.hpp"
 #include "nhttp/io/range_stream.hpp"
+#include "nhttp/io/socket_stream.hpp"
+#include "nhttp/platform/socket.hpp"
 
 namespace nhttp::server::http1_io {
+
+	namespace {
+
+		/* the sendfile(2) fast path from PLAN.md's P1: a zero-userspace-copy,
+		 * no-thread-hop send straight from the file's page cache to the
+		 * socket, instead of write_message_body's generic loop (thread-pool
+		 * read into a buffer, then write that buffer out). Only reachable when
+		 * write_message_body's caller already established every precondition
+		 * (plain file body, plain TCP wire, non-negative content_length,
+		 * platform support) — see its call site below. */
+		async::task<void> write_message_body_sendfile(io::socket_stream& wire, io::file_stream& body, std::int64_t content_length) {
+			std::int64_t offset = 0; // file_stream::open() never seeks, so a fresh body starts at 0.
+			std::int64_t remaining = content_length;
+
+			while (remaining > 0) {
+				const std::size_t want = static_cast<std::size_t>(remaining);
+				const std::size_t sent = co_await wire.socket().send_file(body.native_fd(), offset, want);
+
+				if (sent == 0)
+					break; // short file vs. a caller-claimed content_length — same "stop early" behavior the generic loop has on body.read() == 0.
+
+				remaining -= static_cast<std::int64_t>(sent);
+			}
+		}
+
+	}
 
 	async::task<bool> read_headers(std::string& read_buffer, io::stream& wire, protocol::http_headers& out, std::size_t max_header_size) {
 		for (;;) {
@@ -103,6 +132,9 @@ namespace nhttp::server::http1_io {
 	async::task<void> write_message_body(io::stream& wire, io::stream& body, std::int64_t content_length) {
 		char buf[4096];
 
+		io::file_stream* const file_body = (content_length > 0) ? dynamic_cast<io::file_stream*>(&body) : nullptr;
+		io::socket_stream* const socket_wire = file_body ? dynamic_cast<io::socket_stream*>(&wire) : nullptr;
+
 		if (content_length < 0) {
 			for (;;) {
 				const std::size_t got = co_await body.read(buf, sizeof(buf));
@@ -117,6 +149,14 @@ namespace nhttp::server::http1_io {
 			}
 
 			co_await write_all(wire, protocol::chunked_body_terminator.data(), protocol::chunked_body_terminator.size());
+		}
+		else if (socket_wire && platform::socket_handle::supports_send_file()) {
+			// plain file over plain TCP (never TLS — no kernel-level sendfile
+			// equivalent there) with a known length and no transform: the
+			// sendfile(2) fast path. A byte-Range response's file_stream is
+			// wrapped in a range_stream, which fails the file_body cast above
+			// and correctly falls through to the generic path below instead.
+			co_await write_message_body_sendfile(*socket_wire, *file_body, content_length);
 		}
 		else {
 			std::int64_t remaining = content_length;

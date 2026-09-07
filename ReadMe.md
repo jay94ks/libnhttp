@@ -306,9 +306,9 @@ Static-file throughput was measured against nginx 1.24 and Apache 2.4.58 (event 
 threads / 200 connections / 30s. Apache's stock `MaxRequestWorkers` (150) was raised to 800
 before measuring — the default caps concurrency well below anything a production deployment
 would run, and left unraised it produced socket errors under this load rather than a meaningful
-number. nhttpd's `blocking_pool_size` (the fixed-size pool that offloads blocking file
-stat/open/read — see `CLAUDE.md`'s architecture decisions, point 3) was likewise raised from its
-default of 4 to 64 for the same reason; the untuned default reaches roughly 10,700 req/s here.
+number. **nhttpd needs no such tuning**: every number below is the untouched library default
+(`blocking_pool_size` = 4) — see [PLAN.md](PLAN.md)'s P4 for why a small pool is now *better*
+than a large one, the opposite of the advice an earlier round of this benchmark gave.
 
 **Two real bugs in this library were found and fixed while running this benchmark** — both are
 now fixed on `main`, and the numbers below reflect the fixed build:
@@ -333,19 +333,52 @@ now fixed on `main`, and the numbers below reflect the fixed build:
   for socket writes — it reports `WSAECONNRESET`/`WSAECONNABORTED` instead); the resulting `EPIPE`
   from `write()` was already handled correctly as an ordinary closed connection.
 
-### Loopback (same-kernel), post-fix
+### Loopback (same-kernel), current `main`
 
 | Server | Req/s | Avg latency | p50 | p99 |
 |---|---:|---:|---:|---:|
-| nginx 1.24 | 139,431 | 2.39 ms | 0.97 ms | 17.38 ms |
-| Apache 2.4.58 (event MPM, tuned) | 38,584 | 11.54 ms | 5.19 ms | 98.65 ms |
-| nhttpd (this repo, tuned) | 13,818 | 15.18 ms | 13.19 ms | 51.89 ms |
+| nginx 1.24 | 124,984 | 3.13 ms | 1.04 ms | 27.14 ms |
+| Apache 2.4.58 (event MPM, tuned) | 34,696 | 11.13 ms | 6.00 ms | 95.80 ms |
+| **nhttpd (this repo, untuned default)** | **57,964** | **4.11 ms** | **2.89 ms** | **24.45 ms** |
 
-nhttpd is behind both on raw throughput for this specific micro-benchmark (a tiny static file,
-repeatedly, over persistent connections) — expected, and not yet optimized: every request round
-trips through the blocking thread pool multiple times (stat, open, size, read, close), where
-nginx serves the same file via `sendfile()` with zero userspace copies and no thread hop at all.
-See [PLAN.md](PLAN.md) for the concrete plan to close this gap.
+nhttpd went from 13.8K req/s (the state this Benchmarks section originally documented) to 58K
+req/s on this exact benchmark — a ~4.2× improvement, now clearly ahead of Apache and at roughly
+half of nginx's throughput, instead of a tenth of it. [PLAN.md](PLAN.md) has the full, honest
+account of everything tried to get here, including two dead ends that were implemented, measured,
+and reverted rather than kept on the strength of theory alone:
+
+* **P1 — a `sendfile(2)` fast path for static files.** The single largest win: a whole-file GET
+  now goes straight from the file descriptor to the socket in one syscall, bypassing the blocking
+  thread pool and every userspace buffer copy that the generic read/write loop needed.
+* **P2 — cut redundant thread-pool round trips.** `overlay`/`single_file` no longer stat the same
+  path twice (once in `wants()`, once in `handle()`), and `file_stream::open()` combines its
+  `fopen` and size probe into one thread-pool hop instead of two.
+* **P3 — a custom coroutine-frame allocator: tried, measured, reverted.** Implemented a
+  thread-local size-bucketed free-list allocator for `task<T>`'s frames; A/B benchmarking showed
+  no measurable improvement (glibc's `tcache`, already thread-local and size-classed, already
+  covers this).
+* **P4 — `thread_pool`'s job queue: three iterations, the last one shipped.** ① A `std::counting_
+  semaphore`-backed lock-free queue measured ~2× *slower* under sustained load, because it forces
+  every dequeue — even by an already-busy worker — to pay a synchronization cost the original
+  mutex+queue could skip while "hot". ② A lock-free queue paired with a mutex+condvar used only
+  for waking idle workers fixed that, but only once `blocking_pool_size` stopped being
+  over-provisioned: at a large pool size (64, this benchmark's own earlier tuning advice) 64
+  OS threads contending over 8 CPU cores lost far more to context-switch overhead than the
+  lock-free queue saved, while at a small pool size the same design hit 68K+ req/s — the best
+  result of the whole round. ③ Simplified further by dropping an atomic "is anyone waiting"
+  gate around the wake-up notification: glibc's `condition_variable::notify_one()` already skips
+  the underlying wake syscall when nothing is waiting, so the gate was one more load and branch
+  per job for a syscall skip the library was already doing — measured equivalent, kept for the
+  simpler code. **Net effect: `blocking_pool_size` no longer needs manual tuning at all — the
+  library's own small default is now the fastest setting**, the opposite of what this section
+  used to recommend.
+* **P5 — a windowed `mmap` read path.** `io::file_stream` can now memory-map a file instead of
+  using buffered `fread()`, sliding a bounded (4&nbsp;MiB) window across it rather than ever
+  mapping an entire large file — see `platform::file_mapping`. Opened *lazily*, on a stream's
+  first actual `read()` call, specifically because a whole-file GET (P1's sendfile path) never
+  calls `read()` at all; an eager open in every case was tried first and measurably regressed
+  the common case by paying for a mapping that would never be used. Only byte-`Range`/TLS/chunked
+  responses — the ones sendfile can't take — exercise this path today.
 
 ### Docker network-stack benchmark
 
@@ -367,17 +400,22 @@ docker compose run --rm bench-client
 ```
 
 Results (4 CPUs / 1&nbsp;GiB per server container, otherwise identical parameters to the loopback
-run above):
+run above), current `main`, nhttpd still at its untuned default:
 
 | Server | Req/s | Avg latency | p50 | p99 |
 |---|---:|---:|---:|---:|
-| nginx 1.24 | 71,216 | 4.18 ms | 2.02 ms | 26.47 ms |
-| Apache 2.4.58 (event MPM, tuned) | 25,705 | 18.10 ms | 7.94 ms | 139.84 ms |
-| nhttpd (this repo, tuned) | 11,170 | 19.36 ms | 15.67 ms | 76.85 ms |
+| nginx 1.24 | 55,171 | 5.31 ms | 2.71 ms | 34.20 ms |
+| Apache 2.4.58 (event MPM, tuned) | 21,558 | 19.36 ms | 9.65 ms | 135.37 ms |
+| **nhttpd (this repo, untuned default)** | **35,869** | **6.53 ms** | **4.62 ms** | **34.00 ms** |
 
-All three containers stayed up and memory-stable for the full run (nhttpd: 11&nbsp;MiB RSS
-after 335K requests) — confirming the coroutine-leak fix holds under real containerized network
-traffic, not just loopback.
+Same story as the loopback numbers: nhttpd (11,170 → 35,869 req/s, a ~3.2× improvement) clearly
+beats Apache here too, and sits at roughly two-thirds of nginx's throughput instead of a sixth.
+All three containers stayed up and memory-stable for the full run — nhttpd used only
+**4.96&nbsp;MiB RSS across 13 threads** after 1.08M requests, both figures lower than nginx's own
+(9 processes/threads, 16.96&nbsp;MiB) and far lower than Apache's (199 processes, 26.93&nbsp;MiB) —
+confirming the coroutine-leak fix holds under real containerized network traffic, not just
+loopback, and that the small default thread/worker counts P1–P4 arrived at are a genuine resource
+efficiency, not just a throughput number.
 
 ## Design documents
 

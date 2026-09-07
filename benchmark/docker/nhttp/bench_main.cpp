@@ -19,10 +19,19 @@ using namespace nhttp::platform;
 int main(int argc, char** argv) {
 	const std::string serve_dir = argc > 1 ? argv[1] : ".";
 	const std::uint16_t port = argc > 2 ? static_cast<std::uint16_t>(std::atoi(argv[2])) : 8080;
-	const std::size_t blocking_pool_size = argc > 3 ? static_cast<std::size_t>(std::atoi(argv[3])) : 64;
 
 	params p;
-	p.blocking_pool_size = blocking_pool_size;
+
+	// only override params' own default (4) if the caller explicitly asks —
+	// see PLAN.md's P4: with the sendfile(2) fast path (P1) handling static
+	// files' actual data transfer, a request only ever touches the blocking
+	// pool for two quick hops (stat + open), and this codebase's lock-free
+	// thread_pool queue performs *best* at (or near) that small default,
+	// not at a large manually-tuned value — over-provisioning workers here
+	// now actively hurts throughput via CPU oversubscription/context-switch
+	// overhead, the opposite of the old mutex-based pool's tuning advice.
+	if (argc > 3)
+		p.blocking_pool_size = static_cast<std::size_t>(std::atoi(argv[3]));
 
 	listener srv(p);
 

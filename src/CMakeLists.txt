@@ -52,6 +52,7 @@ if(WIN32)
 		platform/win32/socket.cpp
 		platform/win32/reactor.cpp
 		platform/win32/file_info.cpp
+		platform/win32/file_mapping.cpp
 	)
 else()
 	list(APPEND NHTTP_SOURCES
@@ -59,6 +60,7 @@ else()
 		platform/posix/socket.cpp
 		platform/posix/reactor.cpp
 		platform/posix/file_info.cpp
+		platform/posix/file_mapping.cpp
 	)
 endif()
 

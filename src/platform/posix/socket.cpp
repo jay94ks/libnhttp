@@ -6,7 +6,9 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <utility>
 
@@ -154,6 +156,18 @@ namespace nhttp::platform {
 
 	std::int64_t socket_handle::write(const void* buf, std::size_t n) const noexcept {
 		return ::write(fd_, buf, n);
+	}
+
+	bool socket_handle::supports_send_file() noexcept {
+		return true;
+	}
+
+	std::int64_t socket_handle::send_file(int in_fd, std::int64_t& offset, std::size_t count) const noexcept {
+		off_t off = static_cast<off_t>(offset);
+		const ssize_t sent = ::sendfile(fd_, in_fd, &off, count);
+		offset = static_cast<std::int64_t>(off);
+
+		return static_cast<std::int64_t>(sent);
 	}
 
 	bool socket_handle::shutdown_both() const noexcept {
