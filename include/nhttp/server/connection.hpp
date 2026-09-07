@@ -28,7 +28,12 @@ namespace nhttp::server {
 		 * works, not just a TCP socket_stream. `ctx` is the io_context actually
 		 * running this connection (stamped onto every request as request::io_ctx
 		 * — see its doc comment for why this must not be a different context). */
-		connection(std::shared_ptr<io::stream> wire, const params& p, async::io_context& ctx, handler_type handler);
+		/* `initial_buffer` seeds read_buffer_ — bytes the caller already read
+		 * off the wire before constructing this connection (listener peeks a
+		 * handful of bytes off every plaintext connection to distinguish an
+		 * HTTP/2 prior-knowledge client from HTTP/1.1 — see listener.cpp). */
+		connection(std::shared_ptr<io::stream> wire, const params& p, async::io_context& ctx, handler_type handler,
+			std::string initial_buffer = std::string());
 
 	public:
 		/* runs until the peer closes, a protocol error occurs, or keep-alive ends. */
@@ -40,9 +45,6 @@ namespace nhttp::server {
 	private:
 		async::task<bool> fill_more();
 		async::task<bool> read_request_line(protocol::http_resource& out);
-		async::task<bool> read_headers(protocol::http_headers& out);
-		async::task<std::shared_ptr<io::stream>> make_body_stream(const protocol::http_headers& headers);
-		async::task<void> write_all(const void* buf, std::size_t n);
 		async::task<void> write_response(response& resp, bool keep_alive);
 
 		static std::string extract_hostname(const protocol::http_headers& headers);

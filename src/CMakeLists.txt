@@ -1,9 +1,8 @@
 # Explicit source list (not GLOB) so CMake reconfigures deterministically when files are added.
+# platform/{posix,win32}/*.cpp implement the same portable headers under
+# include/nhttp/platform/ — selected below by the target OS, never both.
 set(NHTTP_SOURCES
 	version.cpp
-	platform/address.cpp
-	platform/socket.cpp
-	platform/epoll.cpp
 	async/io_context.cpp
 	async/io_context_pool.cpp
 	async/socket.cpp
@@ -25,6 +24,8 @@ set(NHTTP_SOURCES
 	protocol/http_multipart.cpp
 	server/response.cpp
 	server/connection.cpp
+	server/connection_h2.cpp
+	server/http1_io.cpp
 	server/listener.cpp
 	server/extension.cpp
 	server/extensions/vpath.cpp
@@ -32,6 +33,7 @@ set(NHTTP_SOURCES
 	server/extensions/static_content.cpp
 	server/extensions/overlay.cpp
 	server/extensions/single_file.cpp
+	server/extensions/reverse_proxy.cpp
 	router/middleware.cpp
 	router/group_proxy.cpp
 	router/route.cpp
@@ -40,7 +42,25 @@ set(NHTTP_SOURCES
 	ws/handshake.cpp
 	ws/connection.cpp
 	server/extensions/websocket_endpoint.cpp
+	http2/hpack.cpp
+	http2/frame.cpp
 )
+
+if(WIN32)
+	list(APPEND NHTTP_SOURCES
+		platform/win32/address.cpp
+		platform/win32/socket.cpp
+		platform/win32/reactor.cpp
+		platform/win32/file_info.cpp
+	)
+else()
+	list(APPEND NHTTP_SOURCES
+		platform/posix/address.cpp
+		platform/posix/socket.cpp
+		platform/posix/reactor.cpp
+		platform/posix/file_info.cpp
+	)
+endif()
 
 if(NHTTP_ENABLE_TLS)
 	list(APPEND NHTTP_SOURCES
@@ -62,8 +82,14 @@ target_include_directories(nhttp
 		${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-find_package(Threads REQUIRED)
-target_link_libraries(nhttp PRIVATE nhttp_warnings PUBLIC Threads::Threads)
+target_link_libraries(nhttp PRIVATE nhttp_warnings)
+
+if(WIN32)
+	target_link_libraries(nhttp PUBLIC ws2_32 mswsock)
+else()
+	find_package(Threads REQUIRED)
+	target_link_libraries(nhttp PUBLIC Threads::Threads)
+endif()
 
 target_compile_definitions(nhttp PRIVATE
 	NHTTP_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}

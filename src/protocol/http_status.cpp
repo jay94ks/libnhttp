@@ -1,5 +1,7 @@
 #include "nhttp/protocol/http_status.hpp"
 
+#include <cstring>
+
 namespace nhttp::protocol {
 
 	std::string_view http_status::reason_phrase() const noexcept {
@@ -54,6 +56,54 @@ namespace nhttp::protocol {
 		out += ' ';
 		out += reason_phrase();
 		out += "\r\n";
+	}
+
+	std::ptrdiff_t http_status::try_parse(const char* data, std::size_t max, http_status& out, int& http_major, int& http_minor) {
+		const void* nl_ptr = std::memchr(data, '\n', max);
+
+		if (!nl_ptr)
+			return 0;
+
+		const char* nl = static_cast<const char*>(nl_ptr);
+		std::size_t line_len = static_cast<std::size_t>(nl - data);
+		const std::size_t consumed = line_len + 1;
+
+		if (line_len > 0 && data[line_len - 1] == '\r')
+			--line_len;
+
+		const std::string_view line(data, line_len);
+
+		// "HTTP/x.y CODE Reason..." — reason phrase may be empty or absent.
+		if (line.size() < 12 || line.substr(0, 5) != "HTTP/" || line[6] != '.' || line[8] != ' ')
+			return -1;
+
+		const char major_ch = line[5];
+		const char minor_ch = line[7];
+
+		if (major_ch < '0' || major_ch > '9' || minor_ch < '0' || minor_ch > '9')
+			return -1;
+
+		const std::size_t code_start = 9;
+		const std::size_t sp2 = line.find(' ', code_start);
+		const std::string_view code_part = line.substr(code_start, sp2 == std::string_view::npos ? std::string_view::npos : sp2 - code_start);
+
+		if (code_part.size() != 3)
+			return -1;
+
+		int code = 0;
+
+		for (const char c : code_part) {
+			if (c < '0' || c > '9')
+				return -1;
+
+			code = code * 10 + (c - '0');
+		}
+
+		http_major = major_ch - '0';
+		http_minor = minor_ch - '0';
+		out = http_status(code);
+
+		return static_cast<std::ptrdiff_t>(consumed);
 	}
 
 }

@@ -17,9 +17,9 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32)
 	message(WARNING
-		"nhttp currently targets Linux only (epoll-based reactor). "
+		"nhttp targets Linux (epoll) and Windows (IOCP) only. "
 		"Configuring on '${CMAKE_SYSTEM_NAME}' is unsupported and will not build."
 	)
 endif()
@@ -28,6 +28,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_L
 	message(FATAL_ERROR "nhttp requires GCC >= 11 for C++20 coroutine support (found ${CMAKE_CXX_COMPILER_VERSION}).")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
 	message(FATAL_ERROR "nhttp requires Clang >= 14 for C++20 coroutine support (found ${CMAKE_CXX_COMPILER_VERSION}).")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.29)
+	message(FATAL_ERROR "nhttp requires MSVC >= 19.29 (VS 2019 16.10) for C++20 coroutine support (found ${CMAKE_CXX_COMPILER_VERSION}).")
 endif()
 
 option(NHTTP_BUILD_TESTS "Build the nhttp unit/integration test suite" ON)

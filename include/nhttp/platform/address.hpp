@@ -1,11 +1,10 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
-#include <netinet/in.h>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <sys/socket.h>
 #include <vector>
 
 namespace nhttp::platform {
@@ -14,14 +13,21 @@ namespace nhttp::platform {
 
 	/**
 	 * class ip_address.
-	 * an IPv4 or IPv6 address (never both at once).
+	 * an IPv4 or IPv6 address (never both at once). stores raw address bytes in
+	 * network byte order (matching in_addr/in6_addr's own layout, so platform
+	 * .cpp files can convert with a plain memcpy) instead of naming any OS
+	 * socket type here, so this header never needs <netinet/in.h>/<winsock2.h>.
 	 */
 	class ip_address {
 	public:
+		using v4_bytes_t = std::array<std::uint8_t, 4>;
+		using v6_bytes_t = std::array<std::uint8_t, 16>;
+
+	public:
 		ip_address() noexcept;
 
-		static ip_address from_v4(const in_addr& addr) noexcept;
-		static ip_address from_v6(const in6_addr& addr) noexcept;
+		static ip_address from_v4_bytes(const v4_bytes_t& bytes) noexcept;
+		static ip_address from_v6_bytes(const v6_bytes_t& bytes) noexcept;
 
 		/* parses a dotted-decimal IPv4 or a colon-form IPv6 literal. no DNS lookups. */
 		static std::optional<ip_address> parse(std::string_view text) noexcept;
@@ -36,21 +42,23 @@ namespace nhttp::platform {
 		bool is_v4() const noexcept { return version_ == ip_version::v4; }
 		bool is_v6() const noexcept { return version_ == ip_version::v6; }
 
-		/* preconditions: is_v4() / is_v6() respectively. */
-		const in_addr& as_v4() const noexcept { return v4_; }
-		const in6_addr& as_v6() const noexcept { return v6_; }
+		/* preconditions: is_v4() / is_v6() respectively. network byte order. */
+		const v4_bytes_t& v4_bytes() const noexcept { return v4_; }
+		const v6_bytes_t& v6_bytes() const noexcept { return v6_; }
 
 		std::string to_string() const;
 
 	private:
 		ip_version version_;
-		in_addr v4_;
-		in6_addr v6_;
+		v4_bytes_t v4_;
+		v6_bytes_t v6_;
 	};
 
 	/**
 	 * class endpoint.
-	 * an ip_address + port pair, convertible to/from a native sockaddr.
+	 * an ip_address + port pair. conversion to/from a native sockaddr is a
+	 * platform implementation detail (see src/platform/posix|win32) — kept out
+	 * of this public header on purpose, so it never names an OS socket type.
 	 */
 	class endpoint {
 	public:
@@ -60,11 +68,6 @@ namespace nhttp::platform {
 		std::uint16_t port() const noexcept { return port_; }
 
 		std::string to_string() const;
-
-		/* fills `out` and returns the sockaddr length to pass to bind()/connect(). */
-		socklen_t to_sockaddr(sockaddr_storage& out) const noexcept;
-
-		static std::optional<endpoint> from_sockaddr(const sockaddr* addr, socklen_t len) noexcept;
 
 	private:
 		ip_address address_;

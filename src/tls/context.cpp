@@ -46,4 +46,30 @@ namespace nhttp::tls {
 		return std::shared_ptr<tls_context>(new tls_context(ctx));
 	}
 
+	std::shared_ptr<tls_context> tls_context::create_client(bool verify_peer) {
+		ensure_openssl_initialized();
+
+		SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
+
+		if (!ctx)
+			return nullptr;
+
+		SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+		SSL_CTX_set_options(ctx, SSL_OP_NO_COMPRESSION);
+
+		if (verify_peer) {
+			SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
+
+			if (SSL_CTX_set_default_verify_paths(ctx) <= 0) {
+				SSL_CTX_free(ctx);
+				return nullptr;
+			}
+		}
+		else {
+			SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
+		}
+
+		return std::shared_ptr<tls_context>(new tls_context(ctx));
+	}
+
 }

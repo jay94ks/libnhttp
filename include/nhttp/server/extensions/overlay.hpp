@@ -2,11 +2,11 @@
 
 #include "../extension.hpp"
 #include "../../async/thread_pool.hpp"
+#include "../../platform/file_info.hpp"
 
 #include <optional>
 #include <string>
 #include <utility>
-#include <sys/stat.h>
 
 namespace nhttp::server {
 
@@ -38,7 +38,7 @@ namespace nhttp::server {
 		 * actually serve, letting others fall through otherwise) and handle().
 		 * nullopt is also returned in the path-traversal-rejected case; wants()
 		 * treats that as "not mine" and handle() re-checks to report 403. */
-		async::task<std::optional<std::pair<std::string, struct stat>>> resolve(request& req) const;
+		async::task<std::optional<std::pair<std::string, platform::file_info>>> resolve(request& req) const;
 
 		std::string base_dir_;
 		std::string index_file_;

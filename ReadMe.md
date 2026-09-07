@@ -6,9 +6,8 @@
 <img src="https://raw.githack.com/jay94ks/libnhttp/main/logo.png" />
 </p>
 
-An event-driven, coroutine-based HTTP/1.1 server library for C++20, built on a multi-threaded
-epoll reactor. Linux only for now (Windows support is deliberately deferred — see
-[CLAUDE.md](CLAUDE.md)).
+An event-driven, coroutine-based HTTP/1.1 **and HTTP/2** server library for C++20, built on a
+multi-threaded reactor — epoll on Linux, IOCP on Windows (both natively supported).
 
 This is a from-scratch redesign of the original libnhttp: same feature set and design
 philosophy, none of the old implementation carried forward. The design rationale, what changed
@@ -28,6 +27,9 @@ in [CONCEPTS.md](CONCEPTS.md), [USAGE.md](USAGE.md), and
 * [Routing (the `router` module)](#routing-the-router-module)
 * [WebSocket](#websocket)
 * [TLS/SSL](#tlsssl)
+* [Reverse proxy](#reverse-proxy)
+* [HTTP/2](#http2)
+* [Windows](#windows)
 * [Design documents](#design-documents)
 
 ## License
@@ -61,10 +63,11 @@ self-contained implementations under the same license (see `src/ws/sha1.cpp`).
 
 ## Requirements
 
-* Linux (epoll-based reactor; no Windows support in this round)
-* GCC ≥ 11 or Clang ≥ 14 (C++20 coroutines)
+* Linux (epoll-based reactor) or Windows (IOCP-based reactor)
+* GCC ≥ 11, Clang ≥ 14, or MSVC ≥ 19.29 (VS 2019 16.10) — C++20 coroutines
 * CMake ≥ 3.20
-* OpenSSL (for TLS/SSL support; see `NHTTP_ENABLE_TLS` below to disable)
+* OpenSSL (for TLS/SSL support; see `NHTTP_ENABLE_TLS` below to disable) — on Windows this means
+  an MSVC-linkable OpenSSL dev package (e.g. via vcpkg), not just the `openssl` CLI
 
 ## Building
 
@@ -84,7 +87,17 @@ Build options (`-D<option>=ON|OFF` at configure time):
 | `NHTTP_ENABLE_TLS` | `ON` | Build TLS/SSL support (requires OpenSSL) |
 
 The library builds warning-free under `-Wall -Wextra -Wpedantic` (plus several more, see
-`cmake/CompilerWarnings.cmake`) — this is a hard requirement, not aspirational.
+`cmake/CompilerWarnings.cmake`) — this is a hard requirement, not aspirational. On MSVC the
+closest equivalent is used instead (`/W4 /permissive-`, no 1:1 match for every GCC/Clang flag).
+
+On Windows, from a native shell with the MSVC toolchain on `PATH` (e.g. after running
+`vcvars64.bat`), the same three commands work unchanged:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
 ## Quickstart example
 
@@ -131,22 +144,27 @@ call-site patterns.
 ## Architecture overview
 
 ```
-src/platform/    epoll, raw sockets, ipv4/ipv6 endpoints
+src/platform/    portable address/socket/reactor/file_info API, backed by posix/ (epoll) or
+                 win32/ (IOCP) — never both in one build
 src/async/       task<T> (coroutines), io_context (the reactor), io_context_pool
-                 (SO_REUSEPORT multi-threading), thread_pool (blocking-work offload)
+                 (SO_REUSEPORT multi-threading, or an explicit round-robin fallback where
+                 SO_REUSEPORT isn't available), thread_pool (blocking-work offload)
 src/io/          async stream interface + memory/file/range/socket streams
 src/protocol/    header/method/status/mime/date/query-string/resource parsing,
                  chunked transfer codec, multipart/form-data streaming parser
-src/server/      listener, HTTP/1.1 connection (one coroutine, no state-machine enum),
-                 request/response, the extension registry, vhost/vpath/overlay/single_file
+src/server/      listener, HTTP/1.1 connection and HTTP/2 connection_h2 (one coroutine each,
+                 no state-machine enum), request/response, the extension registry,
+                 vhost/vpath/overlay/single_file/reverse_proxy
 src/router/      the REST router: path trie, fluent registration DSL, middleware, grouping
 src/ws/          WebSocket handshake + real RFC 6455 frame I/O
+src/http2/       HPACK (RFC 7541) + frame codec (RFC 9113)
 ```
 
-A `listener` runs one `io_context` per worker thread; each worker binds its own
-`SO_REUSEPORT` socket per listening endpoint, so the kernel — not this library — load-balances
-accepted connections across threads. A connection stays on whichever worker accepted it for its
-entire lifetime.
+A `listener` runs one `io_context` per worker thread. On platforms with `SO_REUSEPORT` (Linux),
+each worker binds its own socket per listening endpoint and the kernel load-balances accepted
+connections across threads; where that's unavailable (Windows has no equivalent), one worker
+accepts and explicitly round-robins each new connection onto another. Either way, a connection
+stays on whichever worker ends up owning it for its entire lifetime.
 
 ## Static file serving
 
@@ -232,6 +250,55 @@ are ordinary `co_await`s and never block a reactor thread. Everything above the 
 (routing, extensions, `overlay`, WebSocket, etc.) works identically over TLS with no code
 changes — see `examples/nhttpd/main.cpp` for a listener that serves both plain HTTP and HTTPS.
 
+## Reverse proxy
+
+```cpp
+using nhttp::server::upstream;
+
+std::vector<upstream> upstreams{
+	upstream(endpoint(ip_address::loopback_v4(), 9001)),
+	upstream(endpoint(ip_address::loopback_v4(), 9002)),
+};
+
+srv.extends(reverse_proxy_for("/api", upstreams)); // plain round-robin across both
+```
+
+Mounts one or more upstreams under a URL prefix (the same `vpath` mounting `router` uses) and
+relays HTTP/1.1 requests/responses verbatim, including a WebSocket upgrade (passed through as a
+raw byte splice once the upstream answers `101`). For an HTTPS upstream, set `use_tls = true`
+and `tls_sni_hostname` on the `upstream` entry (`verify_tls_cert` defaults to on). Each proxied
+request opens a fresh upstream connection — no connection pooling or active health checking yet
+(a down upstream fails that one request with `502`); see `CLAUDE.md`'s Phase 13 log for the
+full list of current simplifications.
+
+## HTTP/2
+
+Negotiated automatically over plaintext via **prior knowledge** — no code changes needed beyond
+what's already shown above; `listener` detects an HTTP/2 client connection preface on any
+plaintext connection and routes it to the HTTP/2 driver instead of HTTP/1.1:
+
+```bash
+curl --http2-prior-knowledge http://127.0.0.1:8080/whoami
+```
+
+Every extension, the router, and `reverse_proxy` work identically over HTTP/2 with zero code
+changes — a stream's request is dispatched through the exact same `listener::dispatch()` path
+HTTP/1.1 uses. **ALPN-negotiated HTTP/2 over TLS is not implemented in this round** (deferred
+alongside a couple of other real scope cuts — request bodies are fully buffered before dispatch,
+response headers are assumed to fit in one `HEADERS` frame, and a few SETTINGS aren't enforced;
+see `CLAUDE.md`'s Phase 14 log for the complete, honest list). QUIC/HTTP-3 is not implemented at
+all and isn't planned for this project (see `CLAUDE.md`'s architecture-decisions log for why).
+
+## Windows
+
+Windows is a fully supported, natively-tested target (not best-effort) since the platform layer
+was hardened in a dedicated pass — see `CLAUDE.md`'s Phase 12 log for the real bugs found
+bringing up the IOCP reactor (a couple of them are genuinely useful "gotchas" for anyone doing
+Windows socket programming, not just libnhttp-specific). One real, permanent behavioral
+difference from Linux: Windows has no `SO_REUSEPORT` equivalent, so `listener` falls back to a
+single accept loop that explicitly round-robins connections across workers there (see the
+architecture overview above) — functionally equivalent, just not kernel-balanced.
+
 ## Design documents
 
 * [CONCEPTS.md](CONCEPTS.md) — the design philosophy and invariants carried forward from the
@@ -239,7 +306,7 @@ changes — see `examples/nhttpd/main.cpp` for a listener that serves both plain
   all since closed in this rewrite.
 * [USAGE.md](USAGE.md) — the original implementation's observable usage patterns, used as the
   spec for "does the new API still let a caller express the same intent."
-* [docs/protocol-extensibility.md](docs/protocol-extensibility.md) — a review of the current
-  design against the architectural seams a future HTTP/2/QUIC implementation would need.
+* [docs/protocol-extensibility.md](docs/protocol-extensibility.md) — a review of the design
+  against the architectural seams HTTP/2 needed (all three held unchanged) and QUIC still would.
 * [CLAUDE.md](CLAUDE.md) — the running build/architecture/decisions log for anyone (human or
   otherwise) picking up work on this repo.

@@ -21,7 +21,7 @@ namespace nhttp_test {
 			const nhttp::platform::ip_address addr = version == nhttp::platform::ip_version::v4
 				? nhttp::platform::ip_address::loopback_v4()
 				: nhttp::platform::ip_address::loopback_v6();
-			ok_ = sock_.connect_raw(nhttp::platform::endpoint(addr, port)) == nhttp::platform::connect_result::connected;
+			ok_ = sock_.connect(nhttp::platform::endpoint(addr, port)) == nhttp::platform::connect_result::connected;
 		}
 
 		~raw_http_client() { sock_.close(); }
@@ -40,7 +40,7 @@ namespace nhttp_test {
 			std::size_t sent = 0;
 
 			while (sent < request_bytes.size()) {
-				const ssize_t n = sock_.write(request_bytes.data() + sent, request_bytes.size() - sent);
+				const std::int64_t n = sock_.write(request_bytes.data() + sent, request_bytes.size() - sent);
 				if (n <= 0) break;
 				sent += static_cast<std::size_t>(n);
 			}
@@ -84,7 +84,7 @@ namespace nhttp_test {
 	private:
 		bool fill() {
 			char chunk[4096];
-			const ssize_t n = sock_.read(chunk, sizeof(chunk));
+			const std::int64_t n = sock_.read(chunk, sizeof(chunk));
 
 			if (n <= 0)
 				return false;

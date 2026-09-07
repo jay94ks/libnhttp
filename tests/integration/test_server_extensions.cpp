@@ -8,8 +8,8 @@
 #include "../support/raw_http_client.hpp"
 
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
-#include <sys/stat.h>
 #include <thread>
 
 using namespace nhttp::server;
@@ -27,14 +27,13 @@ namespace {
 		std::string path;
 
 		temp_dir() {
-			path = "/tmp/nhttp_test_overlay_dir";
-			::mkdir(path.c_str(), 0755);
+			path = (std::filesystem::temp_directory_path() / "nhttp_test_overlay_dir").string();
+			std::filesystem::create_directory(path);
 		}
 
 		~temp_dir() {
-			std::remove((path + "/index.html").c_str());
-			std::remove((path + "/another.txt").c_str());
-			::rmdir(path.c_str());
+			std::error_code ignored;
+			std::filesystem::remove_all(path, ignored);
 		}
 	};
 
@@ -138,8 +137,8 @@ TEST_CASE("overlay supports conditional GET via ETag and byte-Range requests", "
 }
 
 TEST_CASE("vhost dispatches different content based on the Host header", "[integration][extensions][vhost]") {
-	const std::string path_a = "/tmp/nhttp_test_vhost_a.txt";
-	const std::string path_b = "/tmp/nhttp_test_vhost_b.txt";
+	const std::string path_a = (std::filesystem::temp_directory_path() / "nhttp_test_vhost_a.txt").string();
+	const std::string path_b = (std::filesystem::temp_directory_path() / "nhttp_test_vhost_b.txt").string();
 	write_file(path_a, "site A");
 	write_file(path_b, "site B");
 

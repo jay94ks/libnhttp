@@ -38,9 +38,11 @@ The full redesign plan (architecture + phased build order) lives at
 ## Architecture decisions (confirmed with the user — do not silently relitigate these)
 
 1. **C++20**, not 17. Coroutines are used for the entire async I/O model.
-2. **CMake** build system, replacing the old `Makefile`/`.vcxproj`/`.sln`. **Linux-first**:
-   Windows support is deliberately deferred, but the platform boundary (`src/platform/`) must
-   stay a clean seam so Windows can be added later without redesigning anything above it.
+2. **CMake** build system, replacing the old `Makefile`/`.vcxproj`/`.sln`. ~~Linux-first: Windows
+   support is deliberately deferred~~ — **superseded**: Windows (IOCP-based) support was added
+   in Phase 12 (see the progress log below), on top of exactly the clean platform-boundary seam
+   this decision called for — `include/nhttp/platform/**` needed hardening (see Phase 12's
+   entry) but nothing above `src/platform/` changed.
 3. **Concurrency**: a coroutine `task<T>` type + an `io_context` (one epoll instance + ready
    queue + timer heap) + an `io_context_pool` of N such contexts, each pinned to its own OS
    thread. New connections are load-balanced across worker threads via **`SO_REUSEPORT`**
@@ -66,13 +68,19 @@ The full redesign plan (architecture + phased build order) lives at
 7. ~~TLS/SSL is out of scope for this round~~ — **superseded**: TLS/SSL was implemented in
    Phase 11 (see the progress log below), exactly on top of the stream/transport abstraction
    this decision called for keeping swappable. The abstraction did not need to change.
-8. **HTTP/2 and QUIC are not implemented**, but three architectural seams must be preserved
-   so they can be added later without a redesign: (a) a connection/exchange split — router and
-   handler code must never assume one request per connection; (b) a transport-agnostic async
-   stream abstraction — drivers must talk to the network only through it, never assume a raw
-   TCP socket; (c) headers reach the router/extensions as decoded key/value pairs, never as
-   raw wire bytes, so HPACK/QPACK-decoded headers are indistinguishable from HTTP/1.1 ones at
-   that layer.
+8. ~~HTTP/2 and QUIC are not implemented~~ — **partially superseded**: HTTP/2 was implemented in
+   Phase 14 (see the progress log below), directly on the three seams this decision called for
+   preserving — all three held with zero changes needed, confirmed in Phase 14's entry.
+   **QUIC stays explicitly deferred** — the user considered vendoring a QUIC implementation vs.
+   a from-scratch RFC 9000/9114/9204 stack and chose to defer entirely rather than either
+   (a from-scratch implementation was judged unrealistic to get interoperably correct in this
+   kind of session; vendoring would break this project's zero-third-party-code stance). The
+   three seams: (a) a connection/exchange split — router and handler code must never assume one
+   request per connection; (b) a transport-agnostic async stream abstraction — drivers must talk
+   to the network only through it, never assume a raw TCP socket; (c) headers reach the
+   router/extensions as decoded key/value pairs, never as raw wire bytes, so HPACK/QPACK-decoded
+   headers are indistinguishable from HTTP/1.1 ones at that layer. These three still stand as the
+   seam QUIC/HTTP-3 would need whenever that round happens.
 9. **Warning-free build** (`-Wall -Wextra -Wpedantic`, treated as errors) is a hard requirement,
    not aspirational — don't add code that needs warnings suppressed to compile.
 
@@ -83,24 +91,29 @@ CMakeLists.txt              top-level build config
 cmake/                      CMake helper modules (compiler warnings, etc.)
 include/nhttp/              public headers (mirrors src/ module layout)
 src/
-  platform/                 epoll wrapper, raw socket wrapper, ipv4/ipv6 endpoint types
+  platform/                 portable public API (address/socket/reactor/file_info) + posix/win32
+                             subdirs implementing it (epoll vs IOCP, POSIX vs Winsock) (Phase 12)
   async/                    task<T>, io_context, io_context_pool, socket awaitables, timers,
                              thread_pool (blocking-work offload)
   io/                       async stream interface + memory/file/range/socket streams
   protocol/                 header/method/status/mime/date/query_string/resource/urlencode,
                              chunked codec, multipart/form-data parser
-  server/                   listener, HTTP/1.1 connection coroutine, request/response facade,
-                             tag storage, params/config
-  server/extensions/        extension registry, vhost, vpath, static overlay, single-file serving
+  server/                   listener, HTTP/1.1 connection coroutine, connection_h2 (HTTP/2,
+                             Phase 14), shared http1_io.* framing helpers, request/response
+                             facade, tag storage, params/config
+  server/extensions/        extension registry, vhost, vpath, static overlay, single-file
+                             serving, reverse_proxy (Phase 13)
   router/                   trie-based router (facade/route/middleware/target), successor to xfwk
   ws/                       WebSocket handshake + RFC6455 frame codec + async send/recv
   tls/                      TLS/SSL via OpenSSL (tls_context, tls_stream) — memory-BIO pattern,
-                             implements io::stream so it's a drop-in transport (Phase 11)
+                             implements io::stream so it's a drop-in transport; server *and*
+                             client mode (Phase 11, client mode added in Phase 13)
+  http2/                    HPACK (RFC 7541) + frame codec (RFC 9113) — no QUIC/HTTP-3 (Phase 14)
   depends/                  vendored third-party (sha1, utf8) — reused as-is unless trivially
                              replaceable by a standard facility
 tests/
   unit/                     one file per module, Catch2
-  integration/              real listener on loopback, driven by a small test HTTP/WS client
+  integration/              real listener on loopback, driven by a small test HTTP/WS/HTTP2 client
 examples/
   nhttpd/                   sample app mirroring the old demo endpoints (written in the final phase)
 libnhttp/, libnhttp-tests/, nhttpd/, coverage/, Makefile, *.vcxproj, *.sln
@@ -108,13 +121,11 @@ libnhttp/, libnhttp-tests/, nhttpd/, coverage/, Makefile, *.vcxproj, *.sln
                              deleted only after new implementation reaches parity + user confirms
 ```
 
-## Build & test (Linux — this repo is developed via WSL Ubuntu when the host is Windows)
+## Build & test — Linux (WSL Ubuntu when the host is Windows)
 
-This machine's WSL Ubuntu instance has GCC 13.3.0, CMake 3.28, and Ninja pre-installed and is
-the environment used to actually compile/run/test this project, since the reactor is
-epoll-based and cannot build or run on native Windows. If invoking from a Windows shell, prefix
-commands with `wsl.exe -d Ubuntu -- bash -lc "..."`; paths under `C:\GitHub\libnhttp` are
-reachable inside WSL at `/mnt/c/GitHub/libnhttp`.
+This machine's WSL Ubuntu instance has GCC 13.3.0, CMake 3.28, and Ninja pre-installed. If
+invoking from a Windows shell, prefix commands with `wsl.exe -d Ubuntu -- bash -lc "..."`; paths
+under `C:\GitHub\libnhttp` are reachable inside WSL at `/mnt/c/GitHub/libnhttp`.
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -122,8 +133,26 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Every phase of work must leave the tree in a state where the above three commands succeed with
-zero compiler warnings before moving on.
+## Build & test — Windows (native, since Phase 12 — no longer WSL-only)
+
+This machine has Visual Studio 18 Community (MSVC `cl` 19.51+) and CMake/Ninja installed
+natively. From a native Windows shell (PowerShell/cmd, **not** WSL), load the MSVC environment
+first, then configure/build/test exactly as on Linux — `NHTTP_ENABLE_TLS=OFF` is required here
+specifically on this machine (see Phase 12's progress-log entry: no MSVC-linkable OpenSSL dev
+package is installed, a build-environment gap, not a design one):
+
+```bash
+call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
+cmake -S . -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Debug -DNHTTP_ENABLE_TLS=OFF
+cmake --build build-win
+ctest --test-dir build-win --output-on-failure
+```
+
+(`vcvars64.bat`'s environment doesn't reliably propagate through inline PowerShell one-liners in
+this setup — put the above in a `.bat` file and run that, rather than trying to chain it inline.)
+
+Every phase of work must leave the tree in a state where the build+test commands succeed with
+zero compiler warnings, **on both platforms**, before moving on.
 
 ## Coding conventions
 
@@ -440,9 +469,231 @@ zero compiler warnings before moving on.
     `examples/nhttpd` optionally also serves HTTPS on `port+1` when given cert/key path
     arguments (`./nhttpd [dir] [port] [cert.pem] [key.pem]`).
   - Full suite: 100/100 passing warning-free after this phase.
-- Nothing left on the plan. Future work on this repo starts from a clean, fully-tested C++20
-  implementation — see the module map and build instructions above, and `ReadMe.md` for the
-  user-facing API tour.
+- **Phase 12 (Windows support & a hardened platform boundary) — done.** At the user's request to
+  go beyond feature parity with the original (reverse proxy, Windows, HTTP/2 — QUIC explicitly
+  deferred, see decision #8 above). Verified with real, compiled-and-tested support: natively on
+  this machine via MSVC (VS 18 Community, `cl` 19.51, CMake/Ninja all present on Windows
+  directly), not best-effort/unverified code — `ctest` is 100% green on both platforms after
+  every phase below.
+  - **The public platform headers already leaked POSIX types before this phase**, which is most
+    of what "Windows support" turned out to mean: `include/nhttp/platform/address.hpp` embedded
+    `in_addr`/`in6_addr`/`sockaddr*` in `ip_address`/`endpoint`'s own public interface;
+    `socket.hpp` embedded `sockaddr_storage`/`socklen_t`/`ssize_t` and stored the native handle
+    as `int` (wrong for a Windows `SOCKET`); `io_context.hpp` included `platform/epoll.hpp`
+    purely to declare a private field. Fixed by making every public platform type portable:
+    `ip_address` stores raw address bytes (`std::array<uint8_t,4/16>`) instead of
+    `in_addr`/`in6_addr`; `socket_handle` uses a `native_socket_t` typedef (`#if defined(_WIN32)
+    std::uintptr_t #else int #endif` — pure language, no OS header needed to write this) and
+    `read`/`write` return `std::int64_t`; `accept()` returns `optional<pair<socket_handle,
+    endpoint>>` instead of taking `sockaddr_storage&`; sockaddr conversion moved into
+    `src/platform/{posix,win32}/sockaddr_convert.hpp` (internal-only, never installed);
+    `io_context` now holds a `unique_ptr<platform::reactor>` (a new portable interface —
+    `add`/`modify`/`remove`/`wait`, mirroring what `epoll_handle` already had) instead of a
+    concrete `epoll_handle`, so `io_context.hpp` no longer names any OS type at all. `overlay`/
+    `single_file` no longer include `<sys/stat.h>` — a new `platform::file_info`/`stat_file()`
+    (portable `{kind, size, mtime}`) replaced `struct stat` in their public interfaces too.
+  - **Design — kept the readiness-based `io_context` contract identical on both platforms**,
+    deliberately not redesigning `async_socket`/`io_context` around IOCP's native completion
+    model (a much larger, riskier rewrite touching every socket call site). The Windows
+    `iocp_reactor` (`src/platform/win32/reactor.cpp`) uses **WSAEventSelect + a threadpool wait
+    (`RegisterWaitForSingleObject`) bridging the Win32 event-object signal into the IOCP
+    completion port via a plain `PostQueuedCompletionStatus`** — purely observational, so the
+    *already-portable* retry-on-`would_block()` loops in `async_socket::read_some/write_some/
+    accept/connect` and `socket_handle` needed zero changes. This single mechanism (one
+    `WSAEventSelect` mask per registration: `FD_READ|FD_ACCEPT|FD_CLOSE` for read-interest,
+    `FD_WRITE|FD_CONNECT|FD_CLOSE` for write-interest) uniformly covers listening sockets,
+    connecting sockets, and established connections — see below for the two other designs tried
+    and rejected first, and why.
+  - **Three real bugs found and fixed while bringing this reactor up** (in order of discovery —
+    left in detail since each is a genuine, non-obvious Windows socket-programming pitfall worth
+    not re-deriving next time):
+    1. *MSVC decodes this repo's UTF-8 source files using the system codepage, not UTF-8, absent
+       a BOM.* On this (Korean-locale) machine that's CP949; every non-ASCII character in a
+       comment (em dashes, arrows, etc. — this whole file included) tripped `C4819`, fatal under
+       `/WX`. Fixed by adding `/utf-8` to the MSVC branch of `cmake/CompilerWarnings.cmake` —
+       not cosmetic, this is required for the tree to compile on MSVC at all outside an
+       English/UTF-8-default locale.
+    2. *A zero-byte overlapped `WSARecv` — the standard trick for read-readiness on a connected
+       socket — doesn't apply to a listening socket at all* (Winsock rejects it outright; a
+       listening socket has no data channel to recv from), and the idiomatic IOCP answer
+       (`AcceptEx`) *consumes* the pending connection as part of arming, which is incompatible
+       with this reactor's "signal readiness, let the generic retry loop do the real op"
+       contract — the same contract `read`/`write`/`connect` all rely on identically. This is
+       what led to the unified `WSAEventSelect`-for-everything design above (superseding an
+       initial version that mixed the zero-byte-`WSARecv` trick for reads with
+       `WSAEventSelect`/`FD_ACCEPT` only for listening sockets specifically).
+    3. *`WSAEventSelect(socket, NULL, 0)` must be called to undo a previous event association
+       **before** closing the event handle* — closing the event first (skipping that call, my
+       first attempt) leaves the *socket itself* in a broken state: every subsequent
+       `accept()`/`recv()`/`send()` on it fails with `WSAENOTSOCK`, even though nothing closed
+       the socket. Manifested as `async_socket accept/connect/read/write round trip` (a Phase-1
+       unit test, the first one that actually drives the reactor for real I/O) crashing with
+       "pure virtual method called" — traced via `gdb`'s coroutine-frame backtrace support to a
+       `buffered_wire_stream` reading through a reference to an already-corrupted `io::stream`.
+       Fixed in `iocp_reactor::remove()`'s listening-socket branch (`src/platform/win32/
+       reactor.cpp`): `WSAEventSelect(fd, nullptr, 0)` before `WSACloseEvent`.
+    4. *`SSL_set_tlsext_host_name`'s macro expansion contains an old-style C cast*, tripping
+       `-Wold-style-cast` at every call site under GCC/Clang (only surfaced once Phase 13 added
+       the first caller of it, client-mode TLS). Fixed by calling the underlying `SSL_ctrl`
+       directly with a proper `static_cast`/`const_cast` instead of the macro — see
+       `src/tls/stream.cpp`.
+    5. *Windows has no `SO_REUSEPORT` equivalent for inbound TCP accept load-balancing* — binding
+       N independent listening sockets to the same port doesn't give kernel-balanced accepts the
+       way it does on Linux. `platform::socket_handle::set_reuse_port()` reports this honestly
+       (returns `false` on Windows rather than silently pretending to succeed) instead of hiding
+       it, and `listener::listen()`/`listen_tls()` treat that as a real capability check: when
+       unavailable, they bind exactly **one** listening socket and round-robin each accepted
+       connection onto a different worker explicitly via a new `io_context::schedule()` primitive
+       (suspend the calling coroutine and resume it on a *specific* target context's own thread —
+       the general form of the hand-off `thread_pool::run()` already did internally), rather than
+       relying on the kernel. This is a genuine behavioral difference between platforms, not a
+       cosmetic one, and is the reason `listener.hpp`'s doc comment now says "SO_REUSEPORT where
+       available" rather than assuming it unconditionally.
+  - A found-but-not-yet-fixed gap: no OpenSSL dev package (MSVC-linkable) is installed on this
+    machine (only the MSYS2/Git-bundled `openssl.exe` CLI) — the Windows verification builds in
+    this and later phases configure with `-DNHTTP_ENABLE_TLS=OFF`. `tls_context`/`tls_stream`
+    themselves need no Windows-specific changes (OpenSSL is already cross-platform) — this is a
+    build-environment gap on this specific machine, not a design gap.
+  - CMake: `src/CMakeLists.txt` selects `platform/{posix,win32}/*.cpp` by `WIN32`, links
+    `ws2_32`/`mswsock` instead of `Threads` there; top-level `CMakeLists.txt`'s hard "Linux only"
+    warning now accepts `WIN32` too (still refuses anything else). `cmake/CompilerWarnings.cmake`
+    gained an MSVC branch (`/W4 /permissive- /utf-8`, `/WX` under `NHTTP_WARNINGS_AS_ERRORS`) —
+    no 1:1 equivalents exist for several GCC/Clang flags this project uses (`-Wshadow`,
+    `-Wold-style-cast`, `-Wconversion`, ...), so parity is close but not exact.
+  - Full suite: 96/96 passing warning-free on **both** Linux (WSL/ctest) and native Windows
+    (MSVC/ctest) at the end of this phase; the example app was also manually verified live on
+    Windows (dual-stack listen, static file serving via `overlay`, the router, graceful shutdown
+    via `POST /exit`) — see `ReadMe.md`'s Windows build section for the exact commands.
+- **Phase 13 (reverse proxy) — done.** A new extension, `reverse_proxy` (`src/server/extensions/
+  reverse_proxy.cpp`), derived from `vpath` exactly like `router` is (same "mounted at a URL
+  prefix, `on_handle()` instead of a nested registry" shape) — full scope: multiple upstreams
+  with round-robin load balancing, HTTPS upstreams, and WebSocket upgrade passthrough, all four
+  options the user picked when this was scoped, not just a single fixed upstream.
+  - **Shared HTTP/1.1 message I/O extracted out of `connection.cpp`** into `src/server/
+    http1_io.{hpp,cpp}` (`read_headers`, `make_body_stream`, `write_all`, `write_message_body`) —
+    used unchanged by both the server-role `connection` and the new proxy client code, so the
+    proxied upstream request/response framing can't silently diverge from the server's own (one
+    chunked codec, one set of framing rules, exercised from both directions). `protocol::
+    http_status` gained a `try_parse` mirroring `http_resource::try_parse`, needed to read an
+    upstream's status line. `protocol::header_value_contains_token` was promoted from a
+    `connection.cpp`-local helper to a shared one in `http_header.hpp` for the same reason.
+  - **Client-mode TLS**: `tls_context::create_client(verify_peer)` and `tls_stream::connect
+    (sni_hostname)` added alongside the existing server-only `create_server`/`accept()` — same
+    memory-BIO pump loop, just `SSL_set_connect_state` + SNI (`SSL_ctrl`, see Phase 12's bug #4)
+    instead of `SSL_set_accept_state`. Certificate verification defaults on.
+  - **A real, lifetime-bug crash found and fixed while writing this**: `reverse_proxy::on_handle`
+    built the upstream's decoded response body via `http1_io::make_body_stream`, which returns a
+    `buffered_wire_stream` holding a *reference* to its caller's leftover-bytes buffer and wire —
+    safe for `connection.cpp`'s own use (those references point into `connection`'s own
+    long-lived member fields, alive for the whole connection) but not here: `on_handle`'s
+    coroutine frame (and its local `upstream_leftover`/`wire` variables) is destroyed once
+    `on_handle` returns, *before* `resp.body` is actually read from by the downstream
+    connection's `write_response` — leaving a dangling reference, caught by Catch2's fatal-signal
+    handler as "pure virtual method called" on the very first proxy test. Fixed by adding
+    `http1_io::make_owned_body_stream` / `owned_buffered_wire_stream`, which *own* a moved-in
+    copy of the leftover bytes and a `shared_ptr` to the wire instead of referencing the caller's
+    stack frame — used by `reverse_proxy` in place of the reference-based version, with
+    `make_body_stream`'s doc comment now explicitly warning future callers about this exact
+    lifetime trap.
+  - Round-robin uses a plain `std::atomic<std::size_t>` counter (same pattern as `listener`'s
+    SO_REUSEPORT-fallback worker distribution in Phase 12). Known simplifications, in the same
+    spirit as Phase 4's logged ones: **no upstream connection pooling** (a fresh connection per
+    proxied request/upgrade) and **no active health checking** (a down upstream just fails that
+    one request with a `502`) — both reasonable follow-ups, neither required for correct
+    behavior today.
+  - Integration tests (`tests/integration/test_reverse_proxy.cpp`): a plain GET and a POST body
+    relayed end-to-end, a `502` for an unreachable upstream (using a raw `socket_handle` bound
+    then immediately closed, so the port is *genuinely* refused rather than merely "bound but
+    nothing ever `accept()`s from it" — the latter hangs the proxy's `connect()` instead of
+    failing it fast, a mistake made and caught while writing this test), round-robin distribution
+    across two fake upstreams, and a WebSocket echo round-tripped through the proxy. Full suite:
+    105/105 passing warning-free on Linux and Windows.
+- **Phase 14 (HTTP/2) — done, scope-reduced from the original plan.** New `src/http2/` module
+  plus a new connection driver, `server::connection_h2`, sitting alongside (not replacing) the
+  HTTP/1.1 `connection` — confirming Seam 1 from decision #8 above (`docs/protocol-
+  extensibility.md`'s "a different connection type, same downstream machinery" claim) holds
+  exactly as written: `connection_h2` decodes a multiplexed frame layer into many concurrent
+  `request`/`response` exchanges, each dispatched through the *same* `listener::dispatch()` used
+  by HTTP/1.1, with zero changes needed to `extension.hpp`, `router/`, or any extension.
+  - **HPACK** (`src/http2/hpack.cpp`, RFC 7541): the static table (Appendix A), a from-scratch
+    Huffman codec (the code table from Appendix B, transcribed from memory and — given the very
+    real risk of a transcription error in a 257-entry bit-precise table — deliberately verified
+    against **RFC 7541 Appendix C.4.1's own official Huffman-coded test vector** in
+    `tests/unit/test_hpack.cpp` before trusting it for anything else; a decode-trie built once
+    from the table, integer/string representation per §5.1/§5.2, and a dynamic table for the
+    decoder side. The encoder always emits literal-without-indexing (never uses the dynamic
+    table) — simpler, still fully RFC-compliant since a decoder must accept any valid
+    representation choice, just not maximally compact; this also means `SETTINGS_HEADER_TABLE_
+    SIZE` from the peer has no effect on this encoder's behavior (it never needs a table size
+    limit if it never populates one), which `connection_h2`'s SETTINGS handling notes explicitly
+    rather than silently ignoring for an unstated reason.
+  - **Frame codec** (`src/http2/frame.cpp`): the 9-byte frame header, SETTINGS/WINDOW_UPDATE/
+    RST_STREAM/GOAWAY/PING payload read/write, and padding-stripping shared by DATA and HEADERS.
+    Server push, the legacy `Upgrade: h2c` bootstrap, and PRIORITY frame reordering are
+    deliberately not implemented (push is deprecated in practice across current browsers;
+    prior-knowledge — which *is* implemented — is what virtually every current client/tool,
+    curl's `--http2-prior-knowledge` included, actually uses; PRIORITY is parsed just enough to
+    skip its 5-byte payload and otherwise ignored, matching RFC 9218's own de-emphasis of the
+    original priority scheme).
+  - **`connection_h2`** owns the connection preface + SETTINGS exchange, per-stream state, and
+    flow control (connection- and stream-level send windows, replenished via `WINDOW_UPDATE`
+    immediately after consuming `DATA` — simple and correct, not the most bandwidth-efficient
+    possible batching). A stream's response-writing coroutine suspends on a per-stream
+    `coroutine_handle` when its send window is exhausted, resumed directly by the frame-read
+    loop's `WINDOW_UPDATE` handling — deliberately not a generic `async::` primitive, since
+    exactly one thing (this) needs it. Multiple concurrent streams are genuinely independent
+    detached coroutines (spawned by the frame-read loop once a stream's headers — and body, if
+    any — are fully received), serialized only where they must be: physically writing frames to
+    the wire, via a small single-threaded cooperative `writer_lock` (not a real mutex — every
+    coroutine for one connection runs on the *same* io_context thread by construction, so this
+    only needs to arbitrate interleaved coroutine suspension, never true cross-thread
+    contention). Verified interoperating with **real curl** (`--http2-prior-knowledge`,
+    including `-Z` parallel mode genuinely multiplexing multiple streams over one TCP
+    connection) against the example app's static files, router, and parameterized routes, before
+    writing the automated suite.
+  - **Negotiation, scope-reduced from the original plan: prior-knowledge cleartext only this
+    round, ALPN-over-TLS explicitly deferred** (a real, honest scope cut made under time
+    constraints, not an oversight — flagging it here the same way QUIC's deferral is flagged in
+    decision #8, so it doesn't get silently assumed done later). `listener::handle_connection`
+    (the plaintext accept path only — TLS's `handle_connection_tls` is untouched) peeks the
+    first 4 bytes of *every* plaintext connection (`"PRI "` is the start of the HTTP/2 client
+    preface, RFC 9113 §3.4, and is a request-line shape no real HTTP/1.1 method ever produces —
+    chosen by the RFC specifically to be unambiguous this way) and constructs `connection_h2` or
+    `connection` accordingly, replaying those bytes as each driver's initial buffer (`io::
+    stream` has no non-destructive peek, so `connection`'s constructor gained an
+    `initial_buffer` parameter to seed `read_buffer_` with them). This is a small, permanent
+    4-byte read added to **every** plaintext connection now, not just HTTP/2 ones — confirmed
+    the full existing suite (HTTP/1.1 included) still passes unchanged.
+  - Other known simplifications: **request bodies are fully buffered** before a stream's handler
+    runs (no live incremental request-body streaming over h2 — simpler, at the cost of holding a
+    large upload fully in memory, capped at a fixed 16 MiB per stream for now, not yet wired to
+    `params`); **response headers are assumed to fit in one HEADERS frame** (no CONTINUATION on
+    the send side — real header sets are essentially always well under
+    `SETTINGS_MAX_FRAME_SIZE`); **`SETTINGS_INITIAL_WINDOW_SIZE` changes only apply to streams
+    opened afterward**, not retroactively adjusted on already-open streams per RFC 9113 §6.9.2's
+    full generality (real clients send their initial SETTINGS before opening any streams in
+    practice, making this a non-issue for typical usage); **`SETTINGS_MAX_CONCURRENT_STREAMS`
+    is not enforced**; a `response::upgrade_handler` (e.g. from `websocket_endpoint` or
+    `reverse_proxy`'s WS passthrough) gets a `501` over h2 instead of being silently attempted —
+    RFC 9113 §8.5 doesn't support the HTTP/1.1 Upgrade mechanism at all, so there's no correct
+    behavior to fall back to.
+  - Integration tests (`tests/integration/test_http2_server.cpp`) use a `raw_h2_client` built on
+    this library's *own* `http2::frame_header`/`hpack_encoder`/`hpack_decoder` — a deliberate
+    departure from every other integration suite's independent-parser philosophy, justified
+    because HPACK/framing correctness is already independently verified against RFC vectors in
+    `test_hpack.cpp`, so reusing them here actually keeps the test focused on what it's meant to
+    exercise (`connection_h2`'s driver logic — preface/SETTINGS handshake, multiplexing, flow
+    control), not re-litigate codec correctness. One real test-client bug caught while writing
+    this: the first version of the multiplexing test *discarded* frames belonging to a stream
+    other than the one it was currently waiting on, silently losing that stream's response before
+    a later call could read it — fixed by buffering (not discarding) out-of-target frames per
+    stream in the test client itself. Covers: a single request/response, a POST body, and two
+    concurrently-multiplexed streams read back in the *opposite* order they were requested
+    (verifying real interleaving, not just sequential completion). Full suite: 113/113 passing
+    warning-free on Linux and Windows.
+- Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8) and Phase 12's noted
+  OpenSSL-on-Windows build-environment gap. Future work on this repo starts from here — see the
+  module map and build instructions above, and `ReadMe.md` for the user-facing API tour.
 
 ## Working style notes for this repo specifically
 

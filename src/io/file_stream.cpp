@@ -1,8 +1,37 @@
+#if defined(_WIN32)
+#define _CRT_SECURE_NO_WARNINGS // fopen() is fine here; no need for fopen_s's different error convention.
+#endif
+
 #include "nhttp/io/file_stream.hpp"
 
+#if !defined(_WIN32)
 #include <sys/types.h>
+#endif
 
 namespace nhttp::io {
+
+	namespace {
+
+		/* fseeko/ftello (POSIX, 64-bit-safe) vs _fseeki64/_ftelli64 (MSVC's
+		 * equivalent — off_t itself is only 32-bit there, so this avoids it
+		 * entirely rather than trying to make it work). */
+		int portable_fseek64(std::FILE* f, std::int64_t offset, int whence) noexcept {
+#if defined(_WIN32)
+			return ::_fseeki64(f, offset, whence);
+#else
+			return ::fseeko(f, static_cast<off_t>(offset), whence);
+#endif
+		}
+
+		std::int64_t portable_ftell64(std::FILE* f) noexcept {
+#if defined(_WIN32)
+			return ::_ftelli64(f);
+#else
+			return static_cast<std::int64_t>(::ftello(f));
+#endif
+		}
+
+	}
 
 	file_stream::file_stream(async::io_context& ctx, async::thread_pool& pool, std::FILE* file, std::int64_t size) noexcept
 		: ctx_(&ctx), pool_(&pool), file_(file), size_(size)
@@ -25,11 +54,11 @@ namespace nhttp::io {
 			co_return nullptr;
 
 		const std::int64_t size = co_await pool.run(ctx, [file]() -> std::int64_t {
-			const off_t current = ::ftello(file);
-			::fseeko(file, 0, SEEK_END);
-			const off_t end = ::ftello(file);
-			::fseeko(file, current, SEEK_SET);
-			return static_cast<std::int64_t>(end);
+			const std::int64_t current = portable_ftell64(file);
+			portable_fseek64(file, 0, SEEK_END);
+			const std::int64_t end = portable_ftell64(file);
+			portable_fseek64(file, current, SEEK_SET);
+			return end;
 		});
 
 		co_return std::make_unique<file_stream>(ctx, pool, file, size);
@@ -46,10 +75,10 @@ namespace nhttp::io {
 		}
 
 		const std::int64_t result = co_await pool_->run(*ctx_, [f, offset, whence]() -> std::int64_t {
-			if (::fseeko(f, static_cast<off_t>(offset), whence) != 0)
+			if (portable_fseek64(f, offset, whence) != 0)
 				return -1;
 
-			return static_cast<std::int64_t>(::ftello(f));
+			return portable_ftell64(f);
 		});
 
 		co_return result;

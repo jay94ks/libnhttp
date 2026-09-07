@@ -38,9 +38,11 @@
 ## 아키텍처 결정 사항 (사용자와 확정됨 — 조용히 재논의하지 말 것)
 
 1. **C++20**, 17이 아님. 코루틴이 비동기 I/O 모델 전체에 쓰입니다.
-2. **CMake** 빌드 시스템, 기존 `Makefile`/`.vcxproj`/`.sln`을 대체함. **Linux 우선**:
-   Windows 지원은 의도적으로 미뤄졌지만, 플랫폼 경계(`src/platform/`)는 나중에 그 위의
-   아무것도 재설계하지 않고도 Windows를 추가할 수 있도록 깔끔한 이음매로 유지되어야 합니다.
+2. **CMake** 빌드 시스템, 기존 `Makefile`/`.vcxproj`/`.sln`을 대체함. ~~Linux 우선: Windows
+   지원은 의도적으로 미뤄짐~~ — **대체됨**: Windows(IOCP 기반) 지원이 Phase 12에서 추가되었습니다
+   (아래 진행 로그 참고), 바로 이 결정이 요구했던 깔끔한 플랫폼 경계 이음매 위에 그대로
+   얹혀서요 — `include/nhttp/platform/**`는 강화가 필요했지만(Phase 12 항목 참고),
+   `src/platform/` 위쪽은 아무것도 바뀌지 않았습니다.
 3. **동시성**: 코루틴 `task<T>` 타입 + `io_context`(epoll 인스턴스 하나 + ready 큐 + 타이머
    힙) + 각각 자신의 OS 스레드에 고정된 N개의 그런 컨텍스트로 이루어진 `io_context_pool`.
    새 커넥션은 수동 work-stealing이 아니라 **`SO_REUSEPORT`**를 통해 워커 스레드 사이에
@@ -66,13 +68,19 @@
 7. ~~TLS/SSL은 이번 라운드의 범위 밖~~ — **대체됨**: TLS/SSL은 Phase 11에서 구현되었습니다
    (아래 진행 로그 참고), 바로 이 결정이 유지하라고 요구했던 stream/transport 추상화 위에
    그대로 얹혀서요. 그 추상화는 변경할 필요가 없었습니다.
-8. **HTTP/2와 QUIC은 구현되지 않지만**, 나중에 재설계 없이 추가할 수 있도록 세 가지
-   아키텍처적 이음매가 보존되어야 합니다: (a) connection/exchange 분리 — 라우터와 핸들러
-   코드는 커넥션당 요청 하나를 절대 가정하면 안 됨; (b) transport에 무관한 비동기 스트림
-   추상화 — 드라이버는 오직 이걸 통해서만 네트워크와 대화해야 하고 raw TCP 소켓을 절대
-   가정하면 안 됨; (c) 헤더는 디코딩된 키/값 쌍으로 라우터/확장에 도달해야 하며 raw 와이어
-   바이트로는 절대 안 됨 — 그래야 HPACK/QPACK으로 디코딩된 헤더가 그 레이어에서 HTTP/1.1
-   헤더와 구분되지 않습니다.
+8. ~~HTTP/2와 QUIC은 구현되지 않음~~ — **부분적으로 대체됨**: HTTP/2는 Phase 14에서
+   구현되었습니다(아래 진행 로그 참고), 바로 이 결정이 보존하라고 요구했던 세 가지 이음매
+   위에 그대로 — 셋 다 변경 없이 유지되었음을 Phase 14 항목에서 확인했습니다.
+   **QUIC은 명시적으로 계속 보류됩니다** — 사용자가 QUIC 구현을 벤더링할지 처음부터 RFC
+   9000/9114/9204 스택을 직접 구현할지 논의한 뒤, 둘 다 하지 않고 완전히 보류하기로
+   결정했습니다(이런 세션에서 처음부터 상호운용 가능한 수준으로 구현하는 건 비현실적이라고
+   판단했고, 벤더링은 이 프로젝트의 '서드파티 코드 없음' 원칙을 깨뜨리기 때문입니다). 세 가지
+   이음매: (a) connection/exchange 분리 — 라우터와 핸들러 코드는 커넥션당 요청 하나를 절대
+   가정하면 안 됨; (b) transport에 무관한 비동기 스트림 추상화 — 드라이버는 오직 이걸 통해서만
+   네트워크와 대화해야 하고 raw TCP 소켓을 절대 가정하면 안 됨; (c) 헤더는 디코딩된 키/값
+   쌍으로 라우터/확장에 도달해야 하며 raw 와이어 바이트로는 절대 안 됨 — 그래야 HPACK/QPACK으로
+   디코딩된 헤더가 그 레이어에서 HTTP/1.1 헤더와 구분되지 않습니다. 이 세 가지는 QUIC/HTTP-3을
+   나중에 구현할 때도 여전히 필요한 이음매로 남습니다.
 9. **경고 없는 빌드**(`-Wall -Wextra -Wpedantic`, 에러로 처리)는 지향점이 아니라 반드시
    지켜야 하는 요구 사항입니다 — 컴파일하려면 경고를 억제해야 하는 코드를 추가하지 마세요.
 
@@ -83,24 +91,30 @@ CMakeLists.txt              최상위 빌드 설정
 cmake/                      CMake 헬퍼 모듈 (컴파일러 경고 등)
 include/nhttp/              공개 헤더 (src/ 모듈 레이아웃을 그대로 반영)
 src/
-  platform/                 epoll 래퍼, 로우 소켓 래퍼, ipv4/ipv6 엔드포인트 타입
+  platform/                 이식 가능한 공개 API (address/socket/reactor/file_info) + 이를
+                             구현하는 posix/win32 하위 디렉터리 (epoll 대 IOCP, POSIX 대
+                             Winsock) (Phase 12)
   async/                    task<T>, io_context, io_context_pool, 소켓 awaitable, 타이머,
                              thread_pool (블로킹 작업 오프로드)
   io/                       비동기 스트림 인터페이스 + memory/file/range/socket 스트림
   protocol/                 header/method/status/mime/date/query_string/resource/urlencode,
                              청크 코덱, multipart/form-data 파서
-  server/                   listener, HTTP/1.1 connection 코루틴, request/response 파사드,
-                             태그 저장소, params/설정
-  server/extensions/        extension registry, vhost, vpath, 정적 overlay, 단일 파일 서빙
+  server/                   listener, HTTP/1.1 connection 코루틴, connection_h2 (HTTP/2,
+                             Phase 14), 공유 http1_io.* 프레이밍 헬퍼, request/response
+                             파사드, 태그 저장소, params/설정
+  server/extensions/        extension registry, vhost, vpath, 정적 overlay, 단일 파일 서빙,
+                             reverse_proxy (Phase 13)
   router/                   트라이 기반 라우터 (facade/route/middleware/target), xfwk의 후계자
   ws/                       WebSocket 핸드셰이크 + RFC6455 프레임 코덱 + 비동기 send/recv
   tls/                      OpenSSL 기반 TLS/SSL (tls_context, tls_stream) — 메모리 BIO
-                             패턴, io::stream을 구현하므로 그대로 꽂히는 transport (Phase 11)
+                             패턴, io::stream을 구현하므로 그대로 꽂히는 transport; 서버
+                             *및* 클라이언트 모드 (Phase 11, 클라이언트 모드는 Phase 13에서 추가)
+  http2/                    HPACK (RFC 7541) + 프레임 코덱 (RFC 9113) — QUIC/HTTP-3은 없음 (Phase 14)
   depends/                  벤더링된 서드파티 (sha1, utf8) — 표준 시설로 간단히 대체 가능하지
                              않은 이상 그대로 재사용
 tests/
   unit/                     모듈당 파일 하나, Catch2
-  integration/              루프백 위의 실제 리스너, 작은 테스트 HTTP/WS 클라이언트로 구동됨
+  integration/              루프백 위의 실제 리스너, 작은 테스트 HTTP/WS/HTTP2 클라이언트로 구동됨
 examples/
   nhttpd/                   기존 데모 엔드포인트를 반영하는 샘플 앱 (마지막 단계에서 작성됨)
 libnhttp/, libnhttp-tests/, nhttpd/, coverage/, Makefile, *.vcxproj, *.sln
@@ -111,13 +125,11 @@ libnhttp/, libnhttp-tests/, nhttpd/, coverage/, Makefile, *.vcxproj, *.sln
 (위 레거시 항목 목록은 실제로 삭제되기 전 계획 당시의 원칙을 그대로 남겨둔 것입니다 — 실제
 삭제는 Phase 10 항목 참고.)
 
-## 빌드 & 테스트 (Linux — 호스트가 Windows일 때는 WSL Ubuntu를 통해 개발함)
+## 빌드 & 테스트 — Linux (호스트가 Windows일 때는 WSL Ubuntu)
 
-이 머신의 WSL Ubuntu 인스턴스에는 GCC 13.3.0, CMake 3.28, Ninja가 미리 설치되어 있으며,
-리액터가 epoll 기반이라 네이티브 Windows에서는 빌드하거나 실행할 수 없으므로 이 프로젝트를
-실제로 컴파일/실행/테스트하는 데 쓰이는 환경입니다. Windows 셸에서 호출한다면 명령어 앞에
-`wsl.exe -d Ubuntu -- bash -lc "..."`를 붙이세요; `C:\GitHub\libnhttp` 아래 경로들은 WSL
-안에서 `/mnt/c/GitHub/libnhttp`로 접근 가능합니다.
+이 머신의 WSL Ubuntu 인스턴스에는 GCC 13.3.0, CMake 3.28, Ninja가 미리 설치되어 있습니다.
+Windows 셸에서 호출한다면 명령어 앞에 `wsl.exe -d Ubuntu -- bash -lc "..."`를 붙이세요;
+`C:\GitHub\libnhttp` 아래 경로들은 WSL 안에서 `/mnt/c/GitHub/libnhttp`로 접근 가능합니다.
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -125,8 +137,26 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-작업의 모든 단계는 다음 단계로 넘어가기 전에 위 세 명령어가 컴파일러 경고 0개로 성공하는
-상태로 트리를 남겨둬야 합니다.
+## 빌드 & 테스트 — Windows (네이티브, Phase 12부터 — 더 이상 WSL 전용이 아님)
+
+이 머신에는 Visual Studio 18 Community(MSVC `cl` 19.51+)와 CMake/Ninja가 네이티브로 설치되어
+있습니다. 네이티브 Windows 셸(PowerShell/cmd, WSL **아님**)에서 먼저 MSVC 환경을 로드한 뒤,
+Linux와 정확히 같은 방식으로 구성/빌드/테스트하세요 — `NHTTP_ENABLE_TLS=OFF`는 **이 머신에서만**
+특별히 필요합니다(Phase 12 진행 로그 항목 참고: MSVC와 링크 가능한 OpenSSL 개발 패키지가
+설치되어 있지 않음 — 설계상의 공백이 아니라 빌드 환경상의 공백입니다):
+
+```bash
+call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
+cmake -S . -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Debug -DNHTTP_ENABLE_TLS=OFF
+cmake --build build-win
+ctest --test-dir build-win --output-on-failure
+```
+
+(`vcvars64.bat`의 환경은 이 환경에서 인라인 PowerShell 한 줄 명령을 통해서는 안정적으로
+전달되지 않습니다 — 인라인으로 체이닝하지 말고 위 내용을 `.bat` 파일로 만들어 실행하세요.)
+
+작업의 모든 단계는 다음 단계로 넘어가기 전에 빌드+테스트 명령어가 **두 플랫폼 모두에서**
+컴파일러 경고 0개로 성공하는 상태로 트리를 남겨둬야 합니다.
 
 ## 코딩 관례
 
@@ -445,8 +475,223 @@ ctest --test-dir build --output-on-failure
     와 예제 앱의 `#ifdef`들을 감쌉니다. `examples/nhttpd`는 인증서/키 경로 인자가 주어지면
     선택적으로 `port+1`에서 HTTPS도 서빙합니다(`./nhttpd [dir] [port] [cert.pem] [key.pem]`).
   - 전체 스위트: 이 단계 이후 100/100 경고 없이 통과.
-- 계획에 남은 것이 없습니다. 이 저장소의 향후 작업은 깨끗하고 완전히 테스트된 C++20 구현에서
-  시작합니다 — 위의 모듈 맵과 빌드 안내를, 그리고 사용자 대상 API 투어는 `ReadMe.md`를
+- **Phase 12 (Windows 지원 & 강화된 플랫폼 경계) — 완료.** 사용자가 원래 구현과의 기능 동등성을
+  넘어서(리버스 프록시, Windows, HTTP/2 — QUIC은 명시적으로 계속 보류, 위 결정 #8 참고) 요청한
+  작업. 실제로 컴파일되고 테스트된 지원으로 검증됨: 이 머신에서 MSVC로 네이티브로(VS 18
+  Community, `cl` 19.51, CMake/Ninja 모두 Windows에 네이티브로 존재) — 최선을 다한
+  미검증 코드가 아니라, 이후 모든 단계에서 두 플랫폼 모두 `ctest`가 100% 통과합니다.
+  - **공개 플랫폼 헤더들이 이 단계 이전부터 이미 POSIX 타입을 누출하고 있었고**, 이게 바로
+    "Windows 지원"의 대부분이었습니다: `include/nhttp/platform/address.hpp`가 `ip_address`/
+    `endpoint`의 공개 인터페이스 자체에 `in_addr`/`in6_addr`/`sockaddr*`를 담고 있었고;
+    `socket.hpp`는 `sockaddr_storage`/`socklen_t`/`ssize_t`를 담고 네이티브 핸들을 `int`로
+    저장했으며(Windows `SOCKET`엔 틀린 타입); `io_context.hpp`는 private 필드 하나를
+    선언하려고 `platform/epoll.hpp`를 include했습니다. 모든 공개 플랫폼 타입을 이식 가능하게
+    만들어 수정: `ip_address`는 `in_addr`/`in6_addr` 대신 원시 주소 바이트
+    (`std::array<uint8_t,4/16>`)를 저장; `socket_handle`은 `native_socket_t` typedef
+    (`#if defined(_WIN32) std::uintptr_t #else int #endif` — 순수 언어 기능, 이걸 쓰는 데
+    OS 헤더가 필요 없음)를 사용하고 `read`/`write`는 `std::int64_t`를 반환; `accept()`는
+    `sockaddr_storage&`를 받는 대신 `optional<pair<socket_handle, endpoint>>`를 반환;
+    sockaddr 변환은 `src/platform/{posix,win32}/sockaddr_convert.hpp`(내부 전용, 설치되지
+    않음)로 이동; `io_context`는 이제 구체적인 `epoll_handle` 대신 `unique_ptr<platform::
+    reactor>`(새로운 이식 가능 인터페이스 — `epoll_handle`이 이미 갖고 있던 것과 같은
+    `add`/`modify`/`remove`/`wait`)를 가지므로 `io_context.hpp`는 더 이상 OS 타입을 전혀
+    이름으로 갖지 않습니다. `overlay`/`single_file`도 더 이상 `<sys/stat.h>`를 include하지
+    않습니다 — 새로운 `platform::file_info`/`stat_file()`(이식 가능한 `{kind, size, mtime}`)이
+    그 공개 인터페이스에서 `struct stat`를 대체했습니다.
+  - **설계 — 두 플랫폼에서 준비성(readiness) 기반 `io_context` 계약을 동일하게 유지했습니다.**
+    `async_socket`/`io_context`를 IOCP의 네이티브 완료(completion) 모델 중심으로 재설계하는
+    것(모든 소켓 호출 지점을 건드리는 훨씬 크고 위험한 재작성)을 의도적으로 하지 않았습니다.
+    Windows용 `iocp_reactor`(`src/platform/win32/reactor.cpp`)는 **WSAEventSelect +
+    스레드풀 대기(`RegisterWaitForSingleObject`)로 Win32 이벤트 객체 신호를 평범한
+    `PostQueuedCompletionStatus`를 통해 같은 IOCP 완료 포트로 연결**하는 방식을 씁니다 —
+    순수하게 관찰만 하는 방식이라, `async_socket::read_some/write_some/accept/connect`와
+    `socket_handle`에 있던 *이미 이식 가능한* would_block() 재시도 루프는 전혀 바뀔 필요가
+    없었습니다. 이 단일 메커니즘(등록당 하나의 `WSAEventSelect` 마스크: 읽기 관심에는
+    `FD_READ|FD_ACCEPT|FD_CLOSE`, 쓰기 관심에는 `FD_WRITE|FD_CONNECT|FD_CLOSE`)이 리스닝
+    소켓, 연결 중인 소켓, 이미 맺어진 커넥션을 균일하게 다룹니다 — 처음에 시도했다가 버린
+    다른 두 설계와 그 이유는 아래 참고.
+  - **이 리액터를 만들면서 발견하고 고친 실제 버그 세 가지**(발견 순서대로 — 각각이 다음에
+    다시 겪지 않을 가치가 있는, 진짜이고 뻔하지 않은 Windows 소켓 프로그래밍 함정이라 자세히
+    남겨둡니다):
+    1. *MSVC는 BOM이 없으면 이 저장소의 UTF-8 소스 파일을 UTF-8이 아니라 시스템 코드페이지로
+       디코딩합니다.* 이 머신(한국어 로캘)에서는 CP949이고; 주석에 있는 모든 비-ASCII
+       문자(이 파일 전체 포함)가 `C4819`를 유발했고 `/WX` 아래에서는 치명적 오류였습니다.
+       `cmake/CompilerWarnings.cmake`의 MSVC 분기에 `/utf-8`을 추가해서 해결 — 장식이
+       아니라, 영어/UTF-8 기본 로캘 밖에서 이 트리가 MSVC로 컴파일되려면 반드시 필요합니다.
+    2. *연결된 소켓의 읽기 준비성을 위한 표준 기법인 제로바이트 오버랩드 `WSARecv`는 리스닝
+       소켓에는 전혀 적용되지 않습니다*(Winsock이 아예 거부함 — 리스닝 소켓엔 데이터 채널이
+       없음), 그리고 관용적인 IOCP식 답인 `AcceptEx`는 무장(arm)하는 과정 자체가 대기 중인
+       커넥션을 *소비*해버려서, 이 리액터의 "준비성을 신호하고, 범용 재시도 루프가 실제
+       작업을 하게 둔다"는 계약과 맞지 않습니다 — `read`/`write`/`connect` 전부가 똑같이
+       의존하는 바로 그 계약입니다. 이게 위의 통합 `WSAEventSelect` 설계로 이어진 계기였습니다
+       (읽기엔 제로바이트 `WSARecv` 기법을, 리스닝 소켓엔 `WSAEventSelect`/`FD_ACCEPT`만
+       섞어 쓰던 초기 버전을 대체함).
+    3. *`WSAEventSelect(socket, NULL, 0)`은 이벤트 핸들을 닫기 **전에** 이전 이벤트 연결을
+       해제하기 위해 호출되어야 합니다* — 이벤트를 먼저 닫아버리면(제가 처음 시도했던 방식,
+       그 호출을 건너뜀) 소켓 자체가 망가진 상태가 됩니다: 이후의 모든 `accept()`/`recv()`/
+       `send()`가 소켓을 닫은 게 아무것도 없는데도 `WSAENOTSOCK`으로 실패합니다. `async_socket
+       accept/connect/read/write round trip`(Phase 1의 유닛 테스트, 리액터를 실제로 구동하는
+       첫 번째 테스트)이 "pure virtual method called"로 크래시하는 것으로 나타났고 — `gdb`의
+       코루틴 프레임 백트레이스 지원으로 추적한 결과 이미 손상된 `io::stream`에 대한 참조를
+       읽는 `buffered_wire_stream`으로 귀결되었습니다. `iocp_reactor::remove()`의 리스닝
+       소켓 분기(`src/platform/win32/reactor.cpp`)에서 `WSACloseEvent` 전에
+       `WSAEventSelect(fd, nullptr, 0)`을 호출하도록 수정.
+    4. *`SSL_set_tlsext_host_name`의 매크로 확장에 구식 C 캐스트가 들어있어서* GCC/Clang에서
+       모든 호출 지점마다 `-Wold-style-cast`를 유발합니다(Phase 13이 클라이언트 모드 TLS의
+       첫 호출자를 추가하면서 비로소 드러남). 매크로 대신 `SSL_ctrl`을 적절한
+       `static_cast`/`const_cast`로 직접 호출해서 수정 — `src/tls/stream.cpp` 참고.
+    5. *Windows에는 인바운드 TCP accept 부하분산을 위한 `SO_REUSEPORT` 대응물이 없습니다* —
+       같은 포트에 독립적인 리스닝 소켓 N개를 바인딩해도 Linux처럼 커널이 균형 있게 accept를
+       분배해주지 않습니다. `platform::socket_handle::set_reuse_port()`는 이를 정직하게
+       보고합니다(성공한 척하지 않고 Windows에서는 `false`를 반환); `listener::listen()`/
+       `listen_tls()`는 이걸 실제 기능 확인으로 취급합니다: 사용할 수 없으면 리스닝 소켓
+       딱 하나만 바인딩하고, 새로운 `io_context::schedule()` 원시 기능(호출한 코루틴을
+       중단시키고 *특정* 대상 컨텍스트 자신의 스레드에서 재개시키는 것 — `thread_pool::run()`이
+       내부적으로 이미 하던 것의 일반형)을 통해 accept된 각 커넥션을 명시적으로 다른 워커에
+       라운드로빈으로 분배합니다. 이건 플랫폼 간 겉치레가 아니라 진짜 동작 차이이며,
+       `listener.hpp`의 문서 주석이 이제 SO_REUSEPORT를 무조건 가정하지 않고 "가능한 경우"라고
+       말하는 이유입니다.
+  - 발견했지만 아직 고치지 않은 공백: 이 머신에는 (MSVC와 링크 가능한) OpenSSL 개발 패키지가
+    설치되어 있지 않습니다(MSYS2/Git에 딸려온 `openssl.exe` CLI만 있음) — 이 단계와 이후
+    단계의 Windows 검증 빌드는 `-DNHTTP_ENABLE_TLS=OFF`로 구성합니다. `tls_context`/
+    `tls_stream` 자체는 Windows 전용 수정이 필요 없습니다(OpenSSL은 이미 크로스플랫폼) —
+    이건 이 특정 머신의 빌드 환경상의 공백이지 설계상의 공백이 아닙니다.
+  - CMake: `src/CMakeLists.txt`가 `WIN32`에 따라 `platform/{posix,win32}/*.cpp`를 선택하고,
+    거기서는 `Threads` 대신 `ws2_32`/`mswsock`을 링크합니다; 최상위 `CMakeLists.txt`의 강경한
+    "Linux 전용" 경고가 이제 `WIN32`도 받아들입니다(그 외는 여전히 거부). `cmake/
+    CompilerWarnings.cmake`에 MSVC 분기가 추가됨(`/W4 /permissive- /utf-8`,
+    `NHTTP_WARNINGS_AS_ERRORS` 아래 `/WX`) — 이 프로젝트가 쓰는 여러 GCC/Clang 플래그
+    (`-Wshadow`, `-Wold-style-cast`, `-Wconversion` 등)에 정확히 대응하는 것이 없어서, 근접하지만
+    완전히 동일하지는 않습니다.
+  - 전체 스위트: 이 단계 끝에서 Linux(WSL/ctest)와 네이티브 Windows(MSVC/ctest) **둘 다**에서
+    96/96 경고 없이 통과; 예제 앱도 Windows에서 실제로 수동 검증됨(듀얼스택 리슨, `overlay`를
+    통한 정적 파일 서빙, 라우터, `POST /exit`를 통한 정상 종료) — 정확한 명령어는
+    `ReadMe.md`의 Windows 빌드 섹션 참고.
+- **Phase 13 (리버스 프록시) — 완료.** 새로운 확장 `reverse_proxy`(`src/server/extensions/
+  reverse_proxy.cpp`)는 `router`와 정확히 같은 방식으로(같은 "URL 접두사에 마운트되고, 중첩
+  registry 대신 `on_handle()`을 쓰는" 모양) `vpath`에서 파생됩니다 — 전체 범위: 라운드로빈
+  로드밸런싱을 하는 다중 업스트림, HTTPS 업스트림, WebSocket 업그레이드 패스스루까지, 범위를
+  정할 때 사용자가 고른 네 가지 옵션 전부이며 단일 고정 업스트림만이 아닙니다.
+  - **`connection.cpp`에서 뽑아낸 공유 HTTP/1.1 메시지 입출력**을 `src/server/
+    http1_io.{hpp,cpp}`(`read_headers`, `make_body_stream`, `write_all`,
+    `write_message_body`)로 옮겼습니다 — 서버 역할인 `connection`과 새로운 프록시 클라이언트
+    코드 둘 다 변경 없이 그대로 사용합니다, 그래서 프록시된 업스트림 요청/응답 프레이밍이
+    서버 자신의 것과 조용히 어긋날 수 없습니다(청크 코덱 하나, 프레이밍 규칙 하나를 양방향
+    모두에서 사용). `protocol::http_status`에 `http_resource::try_parse`를 반영한
+    `try_parse`가 추가되었는데, 업스트림의 상태 줄을 읽는 데 필요합니다.
+    `protocol::header_value_contains_token`도 같은 이유로 `connection.cpp` 로컬 헬퍼에서
+    `http_header.hpp`의 공유 함수로 승격되었습니다.
+  - **클라이언트 모드 TLS**: 기존의 서버 전용 `create_server`/`accept()`와 나란히
+    `tls_context::create_client(verify_peer)`와 `tls_stream::connect(sni_hostname)`가
+    추가되었습니다 — 같은 메모리 BIO 펌프 루프를 그대로 쓰고, `SSL_set_accept_state` 대신
+    `SSL_set_connect_state` + SNI(`SSL_ctrl`, Phase 12의 버그 #4 참고)만 다릅니다. 인증서
+    검증은 기본적으로 켜져 있습니다.
+  - **작성 중 발견하고 고친 실제 수명(lifetime) 버그 크래시**: `reverse_proxy::on_handle`이
+    `http1_io::make_body_stream`으로 업스트림의 디코딩된 응답 바디를 만들었는데, 이 함수는
+    호출자의 leftover 바이트 버퍼와 wire에 대한 *참조*를 갖는 `buffered_wire_stream`을
+    반환합니다 — `connection.cpp` 자신의 사용에서는 안전합니다(그 참조들이 커넥션 전체 동안
+    살아있는 `connection` 자신의 멤버 필드를 가리키므로) 하지만 여기서는 아닙니다:
+    `on_handle`의 코루틴 프레임(과 그 로컬 변수 `upstream_leftover`/`wire`)은 `on_handle`이
+    반환하자마자 파괴되는데, 이는 `resp.body`가 다운스트림 커넥션의 `write_response`에 의해
+    실제로 읽히기 *전*입니다 — 댕글링 참조를 남기고, 이는 최초의 프록시 테스트에서 Catch2의
+    치명적 신호 핸들러에 의해 "pure virtual method called"로 잡혔습니다. `http1_io::
+    make_owned_body_stream` / `owned_buffered_wire_stream`을 추가해서 수정했는데, 이건
+    호출자의 스택 프레임을 참조하는 대신 leftover 바이트의 옮겨진 복사본과 wire에 대한
+    `shared_ptr`을 *소유*합니다 — `reverse_proxy`가 참조 기반 버전 대신 이걸 사용하며,
+    `make_body_stream`의 문서 주석이 이제 앞으로의 호출자들에게 이 정확한 수명 함정을
+    명시적으로 경고합니다.
+  - 라운드로빈은 (Phase 12의 SO_REUSEPORT 대체 워커 분배와 같은 패턴인) 평범한
+    `std::atomic<std::size_t>` 카운터를 씁니다. Phase 4가 기록한 것과 같은 정신의 알려진
+    단순화: **업스트림 커넥션 풀링 없음**(프록시된 요청/업그레이드마다 새 커넥션)과 **능동
+    헬스체크 없음**(다운된 업스트림은 그냥 그 요청 하나만 `502`로 실패) — 둘 다 합리적인
+    후속 작업이며, 오늘 올바르게 동작하는 데 필수는 아닙니다.
+  - 통합 테스트(`tests/integration/test_reverse_proxy.cpp`): 일반 GET과 POST 바디가
+    end-to-end로 릴레이됨, 도달 불가능한 업스트림에 대해 `502`(진짜로 거부되도록 raw
+    `socket_handle`을 바인딩한 뒤 즉시 닫음 — 그냥 "바인딩됐지만 아무도 `accept()`하지
+    않는" 상태로 두면 프록시의 `connect()`가 실패 대신 멈춰버리는데, 이 테스트를 작성하며
+    실수로 겪고 잡아낸 문제입니다), 가짜 업스트림 두 개에 걸친 라운드로빈 분배, 그리고
+    프록시를 통해 왕복하는 WebSocket 에코. 전체 스위트: Linux와 Windows에서 105/105 경고
+    없이 통과.
+- **Phase 14 (HTTP/2) — 완료, 원래 계획에서 범위가 축소됨.** 새로운 `src/http2/` 모듈과
+  HTTP/1.1 `connection`을 대체하지 않고 나란히 놓이는 새로운 커넥션 드라이버
+  `server::connection_h2` — 위 결정 #8의 Seam 1(`docs/protocol-extensibility.md`의 "다른
+  커넥션 타입, 같은 하위 메커니즘" 주장)이 정확히 쓰인 그대로 유지됨을 확인합니다:
+  `connection_h2`는 다중화된 프레임 레이어를 여러 개의 동시적인 `request`/`response` 교환으로
+  디코딩하고, 각각을 HTTP/1.1이 쓰는 것과 *같은* `listener::dispatch()`로 디스패치하며,
+  `extension.hpp`, `router/`, 어떤 확장에도 변경이 필요 없습니다.
+  - **HPACK**(`src/http2/hpack.cpp`, RFC 7541): 정적 테이블(Appendix A), 처음부터 작성한
+    허프만 코덱(Appendix B의 코드 테이블을 기억으로 옮겨적었는데 — 257개 항목짜리 비트 단위로
+    정확해야 하는 테이블에서 옮겨적기 오류의 실제 위험을 고려해 — 다른 어떤 것도 신뢰하기 전에
+    `tests/unit/test_hpack.cpp`에서 **RFC 7541 Appendix C.4.1의 공식 허프만 코딩 테스트
+    벡터**로 의도적으로 검증했습니다), 테이블로부터 한 번 만들어지는 디코드 트라이, §5.1/§5.2에
+    따른 정수/문자열 표현, 그리고 디코더 쪽을 위한 동적 테이블. 인코더는 항상
+    literal-without-indexing만 내보냅니다(동적 테이블을 전혀 쓰지 않음) — 더 단순하면서도
+    완전히 RFC를 준수합니다(디코더는 어떤 유효한 표현 선택도 받아들여야 하므로, 그저 최대로
+    압축되지 않을 뿐입니다); 이는 또한 피어의 `SETTINGS_HEADER_TABLE_SIZE`가 이 인코더의
+    동작에 아무 영향이 없다는 뜻인데(테이블을 채우지 않으니 테이블 크기 제한도 필요 없음),
+    `connection_h2`의 SETTINGS 처리가 이유 없이 조용히 무시하는 대신 이 점을 명시적으로
+    기록합니다.
+  - **프레임 코덱**(`src/http2/frame.cpp`): 9바이트 프레임 헤더, SETTINGS/WINDOW_UPDATE/
+    RST_STREAM/GOAWAY/PING 페이로드 읽기/쓰기, 그리고 DATA와 HEADERS가 공유하는 패딩 제거.
+    서버 푸시, 오래된 `Upgrade: h2c` 부트스트랩, PRIORITY 프레임 재정렬은 의도적으로
+    구현하지 않았습니다(푸시는 현재 브라우저들에서 실질적으로 사용 중단됨; 이미 구현된
+    prior-knowledge가 curl의 `--http2-prior-knowledge`를 포함해 현재 거의 모든
+    클라이언트/도구가 실제로 쓰는 방식; PRIORITY는 5바이트 페이로드를 건너뛸 만큼만 파싱하고
+    나머지는 무시하는데, 이는 RFC 9218 자체가 원래의 우선순위 체계를 경시하는 것과 일치합니다).
+  - **`connection_h2`**는 연결 프리페이스 + SETTINGS 교환, 스트림별 상태, 흐름 제어(연결
+    및 스트림 수준 송신 윈도우, `DATA`를 소비한 직후 `WINDOW_UPDATE`로 즉시 보충 — 단순하고
+    올바르지만 가장 대역폭 효율적인 배칭은 아님)를 소유합니다. 스트림의 응답 작성 코루틴은
+    송신 윈도우가 소진되면 스트림별 `coroutine_handle`에서 중단되고, 프레임 읽기 루프의
+    `WINDOW_UPDATE` 처리가 직접 재개시킵니다 — 의도적으로 일반적인 `async::` 원시 기능이
+    아닌데, 정확히 이 하나의 용도만 필요하기 때문입니다. 여러 동시 스트림은 (스트림의
+    헤더와, 있다면 바디까지 완전히 수신되면 프레임 읽기 루프가 생성하는) 진짜로 독립적인
+    detached 코루틴이며, 반드시 그래야 하는 곳에서만 직렬화됩니다: 실제로 프레임을 wire에
+    쓰는 부분을, 작은 단일 스레드 협조적 `writer_lock`으로(진짜 뮤텍스가 아님 — 한 커넥션의
+    모든 코루틴은 구조상 같은 io_context 스레드에서 실행되므로, 이건 그저 인터리빙된 코루틴
+        중단만 조정하면 되고 진짜 스레드 간 경합은 절대 없습니다). 자동화된 스위트를 작성하기
+    전에 **실제 curl**(`--http2-prior-knowledge`, 하나의 TCP 커넥션 위에서 여러 스트림을
+    진짜로 다중화하는 `-Z` 병렬 모드 포함)이 예제 앱의 정적 파일, 라우터, 파라미터 라우트와
+    상호운용함을 검증했습니다.
+  - **협상, 원래 계획에서 범위 축소됨: 이번엔 prior-knowledge 평문만, ALPN-오버-TLS는
+    명시적으로 보류**(시간 제약 하에 내린 실제적이고 정직한 범위 축소이지 실수가 아닙니다 —
+    결정 #8에서 QUIC의 보류를 표시한 것과 같은 방식으로 여기 표시해서, 나중에 조용히
+    "다 됐다"고 가정되지 않도록 합니다). `listener::handle_connection`(평문 accept 경로만 —
+    TLS의 `handle_connection_tls`는 건드리지 않음)이 모든 평문 커넥션의 첫 4바이트를
+    엿봅니다(`"PRI "`는 HTTP/2 클라이언트 프리페이스의 시작이고, RFC 9113 §3.4, 실제
+    HTTP/1.1 메서드는 절대 만들어내지 않는 요청줄 모양입니다 — RFC가 정확히 이렇게
+    구분되도록 일부러 고른 것) 그리고 그에 따라 `connection_h2` 또는 `connection`을
+    구성하며, 그 바이트들을 각 드라이버의 초기 버퍼로 그대로 재생합니다(`io::stream`에는
+    비파괴적 엿보기가 없어서, `connection`의 생성자에 `read_buffer_`를 그 바이트들로 시드하는
+    `initial_buffer` 매개변수가 추가되었습니다). 이건 이제 HTTP/2뿐 아니라 **모든** 평문
+    커넥션에 추가된 작지만 영구적인 4바이트 읽기입니다 — HTTP/1.1을 포함한 기존 전체 스위트가
+    변경 없이 계속 통과함을 확인했습니다.
+  - 그 외 알려진 단순화: **요청 바디는 스트림의 핸들러가 실행되기 전에 완전히 버퍼링됩니다**
+    (h2를 통한 실시간 점진적 요청 바디 스트리밍 없음 — 더 단순하지만, 큰 업로드를 메모리에
+    완전히 들고 있어야 하는 대가가 있고, 지금은 스트림당 고정 16MiB로 제한되며 아직 `params`에
+    연결되지 않음); **응답 헤더는 HEADERS 프레임 하나에 들어간다고 가정합니다**(송신 쪽에는
+    CONTINUATION이 없음 — 실제 헤더 세트는 거의 항상 `SETTINGS_MAX_FRAME_SIZE`보다 훨씬
+    작음); **`SETTINGS_INITIAL_WINDOW_SIZE` 변경은 이후에 열리는 스트림에만 적용**되고
+    RFC 9113 §6.9.2가 요구하는 완전한 일반성처럼 이미 열린 스트림에 소급 적용되지 않습니다
+    (실제 클라이언트는 스트림을 열기 전에 초기 SETTINGS를 보내므로 실제 사용에서는 문제가
+    되지 않음); **`SETTINGS_MAX_CONCURRENT_STREAMS`는 강제되지 않습니다**; `response::
+    upgrade_handler`(예: `websocket_endpoint`나 `reverse_proxy`의 WS 패스스루에서)는 h2에서
+    조용히 시도되는 대신 `501`을 받습니다 — RFC 9113 §8.5는 HTTP/1.1 Upgrade 메커니즘을
+    전혀 지원하지 않으므로 대체할 올바른 동작이 없습니다.
+  - 통합 테스트(`tests/integration/test_http2_server.cpp`)는 이 라이브러리 *자신*의
+    `http2::frame_header`/`hpack_encoder`/`hpack_decoder` 위에 만든 `raw_h2_client`를
+    씁니다 — 다른 모든 통합 스위트의 독립 파서 철학에서 의도적으로 벗어난 것인데, HPACK/프레이밍
+    정확성은 이미 `test_hpack.cpp`에서 RFC 벡터로 독립적으로 검증되었으므로 여기서 재사용하는
+    게 실제로 테스트의 초점을 (코덱 정확성을 다시 다투는 게 아니라) `connection_h2`의 드라이버
+    로직 — 프리페이스/SETTINGS 핸드셰이크, 다중화, 흐름 제어 — 에 맞추기 때문입니다. 작성 중
+    잡아낸 실제 테스트-클라이언트 버그 하나: 다중화 테스트의 첫 버전은 현재 기다리고 있는
+    스트림이 아닌 다른 스트림에 속한 프레임을 *버렸는데*, 나중 호출이 읽기 전에 그 스트림의
+    응답을 조용히 잃어버렸습니다 — 테스트 클라이언트 자체에서 스트림별로 대상이 아닌 프레임을
+    버리지 않고 버퍼링하도록 고쳤습니다. 다루는 것: 단일 요청/응답, POST 바디, 그리고 요청한
+    것과 *반대* 순서로 읽어들이는 두 개의 동시 다중화 스트림(순차적 완료가 아니라 진짜
+    인터리빙을 검증). 전체 스위트: Linux와 Windows에서 113/113 경고 없이 통과.
+- 계획에 남은 것은 QUIC/HTTP-3(보류, 결정 #8 참고)과 Phase 12가 기록한 Windows에서의 OpenSSL
+  빌드 환경 공백뿐입니다. 이 저장소의 향후 작업은 여기서부터 시작합니다 — 위의 모듈 맵과
+  빌드 안내를, 그리고 사용자 대상 API 투어는 `ReadMe.md`를
   참고하세요.
 
 ## 이 저장소에 특화된 작업 스타일 메모

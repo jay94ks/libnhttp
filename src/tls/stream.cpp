@@ -19,7 +19,6 @@ namespace nhttp::tls {
 		BIO_set_mem_eof_return(wbio_, -1);
 
 		SSL_set_bio(ssl_, rbio_, wbio_); // ssl_ now owns both BIOs.
-		SSL_set_accept_state(ssl_);
 	}
 
 	tls_stream::~tls_stream() {
@@ -56,8 +55,50 @@ namespace nhttp::tls {
 	}
 
 	async::task<bool> tls_stream::accept() {
+		SSL_set_accept_state(ssl_);
+
 		for (;;) {
 			const int rc = SSL_accept(ssl_);
+
+			if (rc == 1) {
+				co_await flush_wbio();
+				co_return true;
+			}
+
+			const int err = SSL_get_error(ssl_, rc);
+			co_await flush_wbio();
+
+			if (err == SSL_ERROR_WANT_READ) {
+				if (!co_await feed_rbio_from_network())
+					co_return false;
+
+				continue;
+			}
+
+			if (err == SSL_ERROR_WANT_WRITE)
+				continue;
+
+			co_return false;
+		}
+	}
+
+	async::task<bool> tls_stream::connect(const std::string& sni_hostname) {
+		SSL_set_connect_state(ssl_);
+
+		// SSL_set_tlsext_host_name(ssl_, sni_hostname.c_str()) is a macro that
+		// expands to an old-style C cast, which -Wold-style-cast flags at this
+		// call site — call the underlying SSL_ctrl directly with a proper C++
+		// cast instead of disabling the warning.
+		SSL_ctrl(ssl_, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name,
+			static_cast<void*>(const_cast<char*>(sni_hostname.c_str())));
+
+		// enables hostname verification against the certificate's SAN/CN when
+		// the context was created with verify_peer=true (SSL_VERIFY_PEER) —
+		// without this, SSL_VERIFY_PEER only checks the chain, not the name.
+		SSL_set1_host(ssl_, sni_hostname.c_str());
+
+		for (;;) {
+			const int rc = SSL_connect(ssl_);
 
 			if (rc == 1) {
 				co_await flush_wbio();

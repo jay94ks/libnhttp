@@ -14,7 +14,7 @@ namespace nhttp::server {
 			base_dir_.pop_back();
 	}
 
-	async::task<std::optional<std::pair<std::string, struct stat>>> overlay::resolve(request& req) const {
+	async::task<std::optional<std::pair<std::string, platform::file_info>>> overlay::resolve(request& req) const {
 		const std::optional<std::string> qualified = qualify_relative_path(subpath_of(req));
 
 		if (!qualified)
@@ -28,10 +28,9 @@ namespace nhttp::server {
 		}
 
 		async::io_context& ctx = *req.io_ctx;
-		struct stat st{};
-		bool exists = co_await pool_->run(ctx, [fs_path, &st] { return ::stat(fs_path.c_str(), &st) == 0; });
+		platform::file_info info = co_await pool_->run(ctx, [fs_path] { return platform::stat_file(fs_path); });
 
-		if (exists && S_ISDIR(st.st_mode)) {
+		if (info.kind == platform::file_kind::directory) {
 			std::string index_path = fs_path;
 
 			if (!index_path.empty() && index_path.back() != '/')
@@ -39,14 +38,14 @@ namespace nhttp::server {
 
 			index_path += index_file_;
 
-			exists = co_await pool_->run(ctx, [index_path, &st] { return ::stat(index_path.c_str(), &st) == 0; });
+			info = co_await pool_->run(ctx, [index_path] { return platform::stat_file(index_path); });
 			fs_path = std::move(index_path);
 		}
 
-		if (!exists || !S_ISREG(st.st_mode))
+		if (info.kind != platform::file_kind::regular_file)
 			co_return std::nullopt;
 
-		co_return std::make_pair(std::move(fs_path), st);
+		co_return std::make_pair(std::move(fs_path), info);
 	}
 
 	async::task<bool> overlay::wants(request& req) {
@@ -66,12 +65,12 @@ namespace nhttp::server {
 		if (!qualify_relative_path(subpath_of(req)))
 			co_return make_response(403);
 
-		std::optional<std::pair<std::string, struct stat>> resolved = co_await resolve(req);
+		std::optional<std::pair<std::string, platform::file_info>> resolved = co_await resolve(req);
 
 		if (!resolved)
 			co_return make_response(404);
 
-		auto& [fs_path, st] = *resolved;
+		auto& [fs_path, info] = *resolved;
 
 		std::unique_ptr<io::file_stream> file = co_await io::file_stream::open(*req.io_ctx, *pool_, fs_path, "rb");
 
@@ -79,10 +78,10 @@ namespace nhttp::server {
 			co_return make_response(404);
 
 		std::shared_ptr<io::stream> shared_file = std::move(file);
-		const std::string etag = make_etag(st.st_mtime, st.st_size);
+		const std::string etag = make_etag(info.mtime, info.size);
 		const std::string_view mime = protocol::mime_type_from_extension(fs_path);
 
-		co_return co_await serve_stream_conditionally(req, shared_file, st.st_size, st.st_mtime, mime, etag);
+		co_return co_await serve_stream_conditionally(req, shared_file, info.size, info.mtime, mime, etag);
 	}
 
 }

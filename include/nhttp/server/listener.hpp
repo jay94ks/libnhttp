@@ -1,6 +1,7 @@
 #pragma once
 
 #include "connection.hpp"
+#include "connection_h2.hpp"
 #include "extension.hpp"
 #include "params.hpp"
 #include "../async/io_context_pool.hpp"
@@ -72,14 +73,28 @@ namespace nhttp::server {
 
 	private:
 		async::task<response> dispatch(request& req);
-		async::task<void> run_connection(async::io_context& ctx, std::shared_ptr<io::stream> wire);
+		async::task<void> run_connection(async::io_context& ctx, std::shared_ptr<io::stream> wire, std::string initial_buffer = std::string());
+		async::task<void> run_connection_h2(async::io_context& ctx, std::shared_ptr<io::stream> wire, std::string preface_leftover);
 
-		async::detached_task accept_loop(async::io_context& ctx, platform::socket_handle listen_handle);
+		/* `distribute`: false = keep every accepted connection on `ctx` (the
+		 * per-worker SO_REUSEPORT case, kernel already balanced it); true =
+		 * round-robin each accepted connection onto a different worker
+		 * (the no-SO_REUSEPORT fallback — see bind_listeners in the .cpp). */
+		async::detached_task accept_loop(async::io_context& ctx, platform::socket_handle listen_handle, bool distribute);
 		async::detached_task handle_connection(async::io_context& ctx, async::async_socket sock);
 
+		/* hands a freshly-accepted, not-yet-touched socket to `target`'s own
+		 * thread (io_context::schedule()) before constructing anything bound
+		 * to it — required so the fallback accept loop's round-robin never
+		 * touches another context's io_registration/reactor state cross-thread. */
+		async::detached_task dispatch_accepted(async::io_context& target, platform::socket_handle raw);
+
+		async::io_context& pick_worker_round_robin() noexcept;
+
 #ifdef NHTTP_HAVE_TLS
-		async::detached_task accept_loop_tls(async::io_context& ctx, platform::socket_handle listen_handle, std::shared_ptr<tls::tls_context> tls_ctx);
+		async::detached_task accept_loop_tls(async::io_context& ctx, platform::socket_handle listen_handle, std::shared_ptr<tls::tls_context> tls_ctx, bool distribute);
 		async::detached_task handle_connection_tls(async::io_context& ctx, async::async_socket sock, std::shared_ptr<tls::tls_context> tls_ctx);
+		async::detached_task dispatch_accepted_tls(async::io_context& target, platform::socket_handle raw, std::shared_ptr<tls::tls_context> tls_ctx);
 #endif
 
 	private:
@@ -90,6 +105,7 @@ namespace nhttp::server {
 		handler_type handler_;
 
 		std::atomic<std::size_t> active_connections_{ 0 };
+		std::atomic<std::size_t> next_worker_{ 0 }; // round-robin, only used when SO_REUSEPORT isn't available
 		std::optional<platform::endpoint> bound_endpoint_;
 #ifdef NHTTP_HAVE_TLS
 		std::optional<platform::endpoint> tls_bound_endpoint_;

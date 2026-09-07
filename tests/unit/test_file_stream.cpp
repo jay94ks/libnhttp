@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <thread>
 
@@ -47,14 +48,15 @@ namespace {
 	}
 
 	detached_task run_open_missing(io_context& ctx, thread_pool& pool, std::unique_ptr<file_stream>& result, std::atomic<bool>& done) {
-		result = co_await file_stream::open(ctx, pool, "/tmp/nhttp_test_definitely_missing.txt", "rb");
+		const std::string missing_path = (std::filesystem::temp_directory_path() / "nhttp_test_definitely_missing.txt").string();
+		result = co_await file_stream::open(ctx, pool, missing_path, "rb");
 		done.store(true, std::memory_order_release);
 	}
 
 }
 
 TEST_CASE("file_stream writes, reads, and seeks a real file via thread_pool offload", "[io][file_stream]") {
-	const std::string path = "/tmp/nhttp_test_file_stream.txt";
+	const std::string path = (std::filesystem::temp_directory_path() / "nhttp_test_file_stream.txt").string();
 	std::remove(path.c_str());
 
 	io_context ctx;

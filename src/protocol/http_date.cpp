@@ -8,6 +8,25 @@ namespace nhttp::protocol {
 
 	namespace {
 
+		/* gmtime_r/timegm are POSIX; MSVC's equivalents take a different
+		 * argument order (gmtime_s) or a different name (_mkgmtime) — wrapped
+		 * here so the rest of this file stays platform-neutral. */
+		std::tm* portable_gmtime(const std::time_t* time, std::tm* out) noexcept {
+#if defined(_WIN32)
+			return ::gmtime_s(out, time) == 0 ? out : nullptr;
+#else
+			return ::gmtime_r(time, out);
+#endif
+		}
+
+		std::time_t portable_timegm(std::tm* tm) noexcept {
+#if defined(_WIN32)
+			return ::_mkgmtime(tm);
+#else
+			return ::timegm(tm);
+#endif
+		}
+
 		constexpr std::array<const char*, 7> weekday_names{
 			"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
 		};
@@ -29,7 +48,7 @@ namespace nhttp::protocol {
 
 	std::string format_http_date(std::time_t time) {
 		std::tm tm{};
-		::gmtime_r(&time, &tm);
+		portable_gmtime(&time, &tm);
 
 		char buf[32];
 		const int n = std::snprintf(buf, sizeof(buf), "%s, %02d %s %04d %02d:%02d:%02d GMT",
@@ -83,7 +102,7 @@ namespace nhttp::protocol {
 		if (tm.tm_mday < 0 || tm.tm_hour < 0 || tm.tm_min < 0 || tm.tm_sec < 0)
 			return static_cast<std::time_t>(-1);
 
-		return ::timegm(&tm);
+		return portable_timegm(&tm);
 	}
 
 }

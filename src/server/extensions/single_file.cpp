@@ -12,16 +12,13 @@ namespace nhttp::server {
 	{
 	}
 
-	async::task<std::optional<struct stat>> single_file::stat_file(request& req) const {
-		struct stat st{};
-		const bool exists = co_await pool_->run(*req.io_ctx, [this, &st] {
-			return ::stat(path_.c_str(), &st) == 0 && S_ISREG(st.st_mode);
-		});
+	async::task<std::optional<platform::file_info>> single_file::stat_file(request& req) const {
+		const platform::file_info info = co_await pool_->run(*req.io_ctx, [this] { return platform::stat_file(path_); });
 
-		if (!exists)
+		if (info.kind != platform::file_kind::regular_file)
 			co_return std::nullopt;
 
-		co_return st;
+		co_return info;
 	}
 
 	async::task<bool> single_file::wants(request& req) {
@@ -32,9 +29,9 @@ namespace nhttp::server {
 	}
 
 	async::task<response> single_file::handle(request& req) {
-		const std::optional<struct stat> st = co_await stat_file(req);
+		const std::optional<platform::file_info> info = co_await stat_file(req);
 
-		if (!st)
+		if (!info)
 			co_return make_response(404);
 
 		std::unique_ptr<io::file_stream> file = co_await io::file_stream::open(*req.io_ctx, *pool_, path_, "rb");
@@ -43,10 +40,10 @@ namespace nhttp::server {
 			co_return make_response(404);
 
 		std::shared_ptr<io::stream> shared_file = std::move(file);
-		const std::string etag = make_etag(st->st_mtime, st->st_size);
+		const std::string etag = make_etag(info->mtime, info->size);
 		const std::string_view mime = mime_override_ ? std::string_view(*mime_override_) : protocol::mime_type_from_extension(path_);
 
-		co_return co_await serve_stream_conditionally(req, shared_file, st->st_size, st->st_mtime, mime, etag);
+		co_return co_await serve_stream_conditionally(req, shared_file, info->size, info->mtime, mime, etag);
 	}
 
 }

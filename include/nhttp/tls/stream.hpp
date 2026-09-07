@@ -35,6 +35,13 @@ namespace nhttp::tls {
 		 * succeed) before read()/write() are called. */
 		async::task<bool> accept();
 
+		/* performs the client-side handshake against an upstream (see
+		 * server::reverse_proxy) — `sni_hostname` is sent as the TLS SNI
+		 * extension and is what certificate verification checks against.
+		 * must be awaited (and must succeed) before read()/write() are
+		 * called; mutually exclusive with accept() on the same tls_stream. */
+		async::task<bool> connect(const std::string& sni_hostname);
+
 	public:
 		std::int64_t get_length() const override { return -1; }
 		bool can_seek() const noexcept override { return false; }

@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 #include <thread>
 
@@ -18,17 +19,22 @@ namespace {
 	/* generates a throwaway self-signed certificate via the `openssl` CLI —
 	 * fine for test setup code (not something the library itself ever does). */
 	struct temp_tls_cert {
-		std::string cert_path = "/tmp/nhttp_test_tls_cert.pem";
-		std::string key_path = "/tmp/nhttp_test_tls_key.pem";
+		std::string cert_path = (std::filesystem::temp_directory_path() / "nhttp_test_tls_cert.pem").string();
+		std::string key_path = (std::filesystem::temp_directory_path() / "nhttp_test_tls_key.pem").string();
 		bool ok = false;
 
 		temp_tls_cert() {
 			std::remove(cert_path.c_str());
 			std::remove(key_path.c_str());
 
+#if defined(_WIN32)
+			const std::string null_redirect = ">NUL 2>&1";
+#else
+			const std::string null_redirect = ">/dev/null 2>&1";
+#endif
 			const std::string cmd =
 				"openssl req -x509 -newkey rsa:2048 -keyout " + key_path + " -out " + cert_path +
-				" -days 1 -nodes -subj /CN=localhost >/dev/null 2>&1";
+				" -days 1 -nodes -subj /CN=localhost " + null_redirect;
 
 			ok = (std::system(cmd.c_str()) == 0);
 		}

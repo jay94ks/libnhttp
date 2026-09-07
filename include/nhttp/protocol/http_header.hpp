@@ -10,6 +10,12 @@ namespace nhttp::protocol {
 
 	bool header_name_equals(std::string_view a, std::string_view b) noexcept;
 
+	/* case-insensitive substring search — good enough for the "close"/
+	 * "keep-alive"/"chunked"/"upgrade" tokens this library actually checks
+	 * for (not full RFC 7230 comma-separated token-list parsing; see
+	 * CLAUDE.md's Phase-4 known-simplifications note). */
+	bool header_value_contains_token(std::string_view value, std::string_view token) noexcept;
+
 	/* well-known header names, as string_view constants (RFC 7230 field names are ASCII). */
 	namespace header_names {
 		inline constexpr std::string_view CONTENT_LENGTH = "Content-Length";

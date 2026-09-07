@@ -6,8 +6,8 @@
 <img src="https://raw.githack.com/jay94ks/libnhttp/main/logo.png" />
 </p>
 
-멀티쓰레드 epoll 리액터 위에 구축된, C++20 코루틴 기반의 이벤트 드리븐 HTTP/1.1 서버 라이브러리입니다.
-현재는 Linux만 지원합니다 (Windows 지원은 의도적으로 뒤로 미뤄뒀습니다 — [CLAUDE.md](CLAUDE.ko.md) 참고).
+멀티쓰레드 리액터(Linux는 epoll, Windows는 IOCP — 둘 다 네이티브로 지원됩니다) 위에 구축된,
+C++20 코루틴 기반의 이벤트 드리븐 HTTP/1.1 **및 HTTP/2** 서버 라이브러리입니다.
 
 이 라이브러리는 기존 libnhttp를 처음부터 완전히 다시 설계한 결과물입니다: 기능 집합과 설계 철학은
 동일하게 유지하되, 기존 구현 코드는 하나도 그대로 가져오지 않았습니다. 무엇이 왜 바뀌었는지, 그리고
@@ -27,6 +27,9 @@
 * [라우팅 (`router` 모듈)](#라우팅-router-모듈)
 * [WebSocket](#websocket)
 * [TLS/SSL](#tlsssl)
+* [리버스 프록시](#리버스-프록시)
+* [HTTP/2](#http2)
+* [Windows](#windows)
 * [설계 문서](#설계-문서)
 
 ## 라이선스
@@ -61,10 +64,11 @@ SOFTWARE.
 
 ## 요구 사항
 
-* Linux (epoll 기반 리액터; 이번 라운드에서는 Windows 미지원)
-* GCC ≥ 11 또는 Clang ≥ 14 (C++20 코루틴)
+* Linux (epoll 기반 리액터) 또는 Windows (IOCP 기반 리액터)
+* GCC ≥ 11, Clang ≥ 14, 또는 MSVC ≥ 19.29 (VS 2019 16.10) — C++20 코루틴
 * CMake ≥ 3.20
-* OpenSSL (TLS/SSL 지원용; 비활성화하려면 아래 `NHTTP_ENABLE_TLS` 참고)
+* OpenSSL (TLS/SSL 지원용; 비활성화하려면 아래 `NHTTP_ENABLE_TLS` 참고) — Windows에서는 `openssl`
+  CLI만으로는 부족하고 MSVC와 링크 가능한 OpenSSL 개발 패키지(예: vcpkg)가 필요합니다
 
 ## 빌드
 
@@ -85,6 +89,17 @@ ctest --test-dir build --output-on-failure
 
 이 라이브러리는 `-Wall -Wextra -Wpedantic`(그리고 그 외 몇 가지, `cmake/CompilerWarnings.cmake`
 참고) 기준으로 경고 없이 빌드됩니다 — 이는 지향점이 아니라 반드시 지켜야 하는 요구 사항입니다.
+MSVC에서는 가장 가까운 대응물이 쓰입니다(`/W4 /permissive-` — 모든 GCC/Clang 플래그에 정확히
+대응하는 건 아닙니다).
+
+Windows에서는, MSVC 툴체인이 `PATH`에 있는 네이티브 셸(예: `vcvars64.bat` 실행 후)에서 같은
+세 명령어가 그대로 동작합니다:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
 ## 빠른 시작 예제
 
@@ -131,21 +146,27 @@ int main() {
 ## 아키텍처 개요
 
 ```
-src/platform/    epoll, 로우 소켓, ipv4/ipv6 엔드포인트
+src/platform/    이식 가능한 address/socket/reactor/file_info API, posix/ (epoll) 또는
+                 win32/ (IOCP)로 구현됨 — 한 빌드에 둘 다 들어가지 않음
 src/async/       task<T> (코루틴), io_context (리액터), io_context_pool
-                 (SO_REUSEPORT 멀티쓰레딩), thread_pool (블로킹 작업 오프로드)
+                 (SO_REUSEPORT 멀티쓰레딩, 또는 SO_REUSEPORT가 없을 때의 명시적 라운드로빈
+                 대체), thread_pool (블로킹 작업 오프로드)
 src/io/          비동기 스트림 인터페이스 + memory/file/range/socket 스트림
 src/protocol/    header/method/status/mime/date/query-string/resource 파싱,
                  청크 전송 코덱, multipart/form-data 스트리밍 파서
-src/server/      listener, HTTP/1.1 connection (상태 머신 enum 없이 코루틴 하나로 표현),
-                 request/response, extension registry, vhost/vpath/overlay/single_file
+src/server/      listener, HTTP/1.1 connection과 HTTP/2 connection_h2 (각각 상태 머신 enum
+                 없이 코루틴 하나로 표현), request/response, extension registry,
+                 vhost/vpath/overlay/single_file/reverse_proxy
 src/router/      REST 라우터: 경로 트라이, 플루언트 등록 DSL, 미들웨어, 그룹핑
 src/ws/          WebSocket 핸드셰이크 + 실제 RFC 6455 프레임 입출력
+src/http2/       HPACK (RFC 7541) + 프레임 코덱 (RFC 9113)
 ```
 
-`listener`는 워커 쓰레드마다 하나의 `io_context`를 실행합니다; 각 워커는 리스닝 엔드포인트마다
-자신만의 `SO_REUSEPORT` 소켓을 바인딩하므로, 이 라이브러리가 아니라 **커널이** 쓰레드 간 accept된
-커넥션을 로드밸런싱합니다. 하나의 커넥션은 그것을 accept한 워커에 생애주기 내내 고정됩니다.
+`listener`는 워커 쓰레드마다 하나의 `io_context`를 실행합니다. `SO_REUSEPORT`가 있는
+플랫폼(Linux)에서는 각 워커가 리스닝 엔드포인트마다 자신만의 소켓을 바인딩하고 커널이 쓰레드
+간 accept된 커넥션을 로드밸런싱합니다; 그게 없는 곳(Windows엔 대응물이 없음)에서는 워커 하나가
+accept하고 새 커넥션을 다른 워커로 명시적으로 라운드로빈합니다. 어느 쪽이든, 하나의 커넥션은
+그것을 소유하게 된 워커에 생애주기 내내 고정됩니다.
 
 ## 정적 파일 서빙
 
@@ -232,13 +253,63 @@ OpenSSL과 `NHTTP_ENABLE_TLS`(기본값 켜짐)가 필요합니다. `listen_tls`
 평문 HTTP와 HTTPS를 동시에 서빙하는 리스너의 실제 예제는 `examples/nhttpd/main.cpp`를
 참고하세요.
 
+## 리버스 프록시
+
+```cpp
+using nhttp::server::upstream;
+
+std::vector<upstream> upstreams{
+	upstream(endpoint(ip_address::loopback_v4(), 9001)),
+	upstream(endpoint(ip_address::loopback_v4(), 9002)),
+};
+
+srv.extends(reverse_proxy_for("/api", upstreams)); // 둘 사이의 평범한 라운드로빈
+```
+
+하나 이상의 업스트림을 URL 접두사 아래 마운트하고(`router`가 마운트되는 것과 같은 `vpath`
+방식) HTTP/1.1 요청/응답을 그대로 릴레이합니다, WebSocket 업그레이드(업스트림이 `101`로
+응답하면 raw 바이트 스플라이스로 패스스루됨)도 포함해서요. HTTPS 업스트림이라면 `upstream`
+항목에 `use_tls = true`와 `tls_sni_hostname`을 설정하세요(`verify_tls_cert`는 기본적으로
+켜져 있습니다). 프록시된 요청마다 새 업스트림 커넥션을 엽니다 — 아직 커넥션 풀링이나 능동
+헬스체크는 없습니다(다운된 업스트림은 그 요청 하나만 `502`로 실패); 현재 알려진 단순화의
+전체 목록은 `CLAUDE.md`의 Phase 13 로그를 참고하세요.
+
+## HTTP/2
+
+평문에서는 **prior knowledge**로 자동 협상됩니다 — 위에 이미 보여준 것 외에 코드 변경이
+필요 없습니다; `listener`가 아무 평문 커넥션에서나 HTTP/2 클라이언트 연결 프리페이스를
+감지하고 HTTP/1.1 대신 HTTP/2 드라이버로 라우팅합니다:
+
+```bash
+curl --http2-prior-knowledge http://127.0.0.1:8080/whoami
+```
+
+모든 확장, 라우터, `reverse_proxy`가 코드 변경 없이 HTTP/2 위에서도 동일하게 동작합니다 —
+스트림의 요청은 HTTP/1.1이 쓰는 것과 정확히 같은 `listener::dispatch()` 경로로 디스패치됩니다.
+**이번 라운드에는 TLS 위 ALPN으로 협상되는 HTTP/2는 구현되지 않았습니다**(몇 가지 다른 실제
+범위 축소와 함께 보류됨 — 요청 바디는 디스패치 전에 완전히 버퍼링되고, 응답 헤더는 HEADERS
+프레임 하나에 들어간다고 가정하며, 일부 SETTINGS는 강제되지 않습니다; 완전하고 정직한 목록은
+`CLAUDE.md`의 Phase 14 로그를 참고하세요). QUIC/HTTP-3은 전혀 구현되지 않았고 이 프로젝트에서
+계획되어 있지도 않습니다(이유는 `CLAUDE.md`의 아키텍처 결정 로그 참고).
+
+## Windows
+
+Windows는 (최선을 다한 정도가 아니라) 완전히 지원되고 네이티브로 테스트된 대상입니다 —
+플랫폼 레이어가 전용 단계에서 강화되었기 때문입니다. IOCP 리액터를 만들면서 발견한 실제
+버그들은 `CLAUDE.md`의 Phase 12 로그를 참고하세요(그중 몇 개는 libnhttp에만 국한되지 않는,
+Windows 소켓 프로그래밍을 하는 누구에게나 진짜 유용한 "함정"입니다). Linux와의 실제 영구적인
+동작 차이 하나: Windows에는 `SO_REUSEPORT` 대응물이 없어서, `listener`는 거기서 단일 accept
+루프가 커넥션을 워커들 사이에 명시적으로 라운드로빈하는 방식으로 대체합니다(위 아키텍처
+개요 참고) — 기능적으로는 동등하지만 커널이 균형을 맞춰주지는 않습니다.
+
 ## 설계 문서
 
 * [CONCEPTS.md](CONCEPTS.ko.md) — 원래 구현으로부터 계승한 설계 철학과 불변조건들, 그리고 원래
   구현이 남겨뒀던 공백(multipart 파싱, WebSocket 프레임, TLS) — 이번 재작성에서 전부 해소됨.
 * [USAGE.md](USAGE.ko.md) — 원래 구현의 실제 사용 패턴. "새 API가 여전히 같은 의도를 표현할 수
   있는가"를 판단하는 기준으로 사용됩니다.
-* [docs/protocol-extensibility.md](docs/protocol-extensibility.ko.md) — 현재 설계를, 향후
-  HTTP/2/QUIC 구현에 필요할 아키텍처적 이음매(seam)들과 대조해 검토한 문서.
+* [docs/protocol-extensibility.md](docs/protocol-extensibility.ko.md) — 설계를 HTTP/2가
+  필요로 했던 아키텍처적 이음매(seam)들과 대조해 검토한 문서(셋 다 변경 없이 유지됨), 그리고
+  QUIC이 여전히 필요로 할 이음매들.
 * [CLAUDE.md](CLAUDE.ko.md) — 이 저장소에서 작업을 이어받는 누구나(사람이든 AI든)를 위한
   빌드/아키텍처/의사결정 기록.

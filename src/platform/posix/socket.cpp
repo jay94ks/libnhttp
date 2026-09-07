@@ -1,6 +1,8 @@
+#include "sockaddr_convert.hpp"
 #include "nhttp/platform/socket.hpp"
 
 #include <cerrno>
+#include <cstring>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -9,6 +11,22 @@
 #include <utility>
 
 namespace nhttp::platform {
+
+	bool would_block() noexcept {
+		return errno == EAGAIN || errno == EWOULDBLOCK;
+	}
+
+	bool was_interrupted() noexcept {
+		return errno == EINTR;
+	}
+
+	int last_socket_error() noexcept {
+		return errno;
+	}
+
+	std::string describe_socket_error(int code) {
+		return std::strerror(code);
+	}
 
 	socket_handle& socket_handle::operator=(socket_handle&& other) noexcept {
 		if (this != &other) {
@@ -30,14 +48,14 @@ namespace nhttp::platform {
 		return socket_handle(::socket(family, type, 0));
 	}
 
-	int socket_handle::release() noexcept {
-		return std::exchange(fd_, -1);
+	native_socket_t socket_handle::release() noexcept {
+		return std::exchange(fd_, invalid_native_socket);
 	}
 
 	void socket_handle::close() noexcept {
-		if (fd_ >= 0) {
+		if (fd_ != invalid_native_socket) {
 			::close(fd_);
-			fd_ = -1;
+			fd_ = invalid_native_socket;
 		}
 	}
 
@@ -79,7 +97,7 @@ namespace nhttp::platform {
 
 	bool socket_handle::bind(const endpoint& ep) const noexcept {
 		sockaddr_storage storage{};
-		const socklen_t len = ep.to_sockaddr(storage);
+		const socklen_t len = posix_detail::endpoint_to_sockaddr(ep, storage);
 
 		return ::bind(fd_, reinterpret_cast<const sockaddr*>(&storage), len) == 0;
 	}
@@ -88,14 +106,28 @@ namespace nhttp::platform {
 		return ::listen(fd_, backlog) == 0;
 	}
 
-	int socket_handle::accept_raw(sockaddr_storage& out_addr, socklen_t& out_len) const noexcept {
-		out_len = sizeof(out_addr);
-		return ::accept(fd_, reinterpret_cast<sockaddr*>(&out_addr), &out_len);
+	std::optional<std::pair<socket_handle, endpoint>> socket_handle::accept() const noexcept {
+		sockaddr_storage storage{};
+		socklen_t len = sizeof(storage);
+
+		const int accepted = ::accept(fd_, reinterpret_cast<sockaddr*>(&storage), &len);
+
+		if (accepted < 0)
+			return std::nullopt;
+
+		auto ep = posix_detail::endpoint_from_sockaddr(reinterpret_cast<const sockaddr*>(&storage), len);
+
+		if (!ep) {
+			::close(accepted);
+			return std::nullopt;
+		}
+
+		return std::make_pair(socket_handle(accepted), *ep);
 	}
 
-	connect_result socket_handle::connect_raw(const endpoint& ep) const noexcept {
+	connect_result socket_handle::connect(const endpoint& ep) const noexcept {
 		sockaddr_storage storage{};
-		const socklen_t len = ep.to_sockaddr(storage);
+		const socklen_t len = posix_detail::endpoint_to_sockaddr(ep, storage);
 
 		if (::connect(fd_, reinterpret_cast<const sockaddr*>(&storage), len) == 0)
 			return connect_result::connected;
@@ -116,11 +148,11 @@ namespace nhttp::platform {
 		return value;
 	}
 
-	ssize_t socket_handle::read(void* buf, std::size_t n) const noexcept {
+	std::int64_t socket_handle::read(void* buf, std::size_t n) const noexcept {
 		return ::read(fd_, buf, n);
 	}
 
-	ssize_t socket_handle::write(const void* buf, std::size_t n) const noexcept {
+	std::int64_t socket_handle::write(const void* buf, std::size_t n) const noexcept {
 		return ::write(fd_, buf, n);
 	}
 
@@ -135,7 +167,7 @@ namespace nhttp::platform {
 		if (::getsockname(fd_, reinterpret_cast<sockaddr*>(&storage), &len) != 0)
 			return std::nullopt;
 
-		return endpoint::from_sockaddr(reinterpret_cast<const sockaddr*>(&storage), len);
+		return posix_detail::endpoint_from_sockaddr(reinterpret_cast<const sockaddr*>(&storage), len);
 	}
 
 	std::optional<endpoint> socket_handle::remote_endpoint() const noexcept {
@@ -145,7 +177,7 @@ namespace nhttp::platform {
 		if (::getpeername(fd_, reinterpret_cast<sockaddr*>(&storage), &len) != 0)
 			return std::nullopt;
 
-		return endpoint::from_sockaddr(reinterpret_cast<const sockaddr*>(&storage), len);
+		return posix_detail::endpoint_from_sockaddr(reinterpret_cast<const sockaddr*>(&storage), len);
 	}
 
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 
@@ -22,6 +23,15 @@ namespace nhttp::protocol {
 	public:
 		/* formats "HTTP/1.x CODE Reason Phrase\r\n" into out. */
 		void write_status_line(std::string& out, int http_minor_version = 1) const;
+
+		/**
+		 * parses "HTTP/x.y CODE Reason..." up to and including its terminating
+		 * '\n' (mirrors http_resource::try_parse's request-line contract, the
+		 * client-role counterpart to it — used when reading a response status
+		 * line, e.g. from a reverse-proxied upstream).
+		 * @returns >0 = bytes consumed, 0 = need more data, <0 = malformed.
+		 */
+		static std::ptrdiff_t try_parse(const char* data, std::size_t max, http_status& out, int& http_major, int& http_minor);
 
 	private:
 		int code_;

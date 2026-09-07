@@ -1,8 +1,14 @@
 #include "nhttp/protocol/http_header.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
-#include <strings.h>
+
+#if defined(_WIN32)
+#include <cstring> // _strnicmp
+#else
+#include <strings.h> // strncasecmp
+#endif
 
 namespace nhttp::protocol {
 
@@ -10,7 +16,23 @@ namespace nhttp::protocol {
 		if (a.size() != b.size())
 			return false;
 
+#if defined(_WIN32)
+		return ::_strnicmp(a.data(), b.data(), a.size()) == 0;
+#else
 		return ::strncasecmp(a.data(), b.data(), a.size()) == 0;
+#endif
+	}
+
+	bool header_value_contains_token(std::string_view value, std::string_view token) noexcept {
+		std::string lowered(value);
+		std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+		std::string lowered_token(token);
+		std::transform(lowered_token.begin(), lowered_token.end(), lowered_token.begin(),
+			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+		return lowered.find(lowered_token) != std::string::npos;
 	}
 
 	std::ptrdiff_t http_header::try_parse(const char* data, std::size_t max, http_header& out) {

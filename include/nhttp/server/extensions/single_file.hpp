@@ -2,10 +2,10 @@
 
 #include "../extension.hpp"
 #include "../../async/thread_pool.hpp"
+#include "../../platform/file_info.hpp"
 
 #include <optional>
 #include <string>
-#include <sys/stat.h>
 
 namespace nhttp::server {
 
@@ -29,7 +29,7 @@ namespace nhttp::server {
 		async::task<response> handle(request& req) override;
 
 	private:
-		async::task<std::optional<struct stat>> stat_file(request& req) const;
+		async::task<std::optional<platform::file_info>> stat_file(request& req) const;
 
 		std::string path_;
 		async::thread_pool* pool_;

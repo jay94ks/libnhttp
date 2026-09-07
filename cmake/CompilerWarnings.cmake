@@ -4,23 +4,40 @@
 
 add_library(nhttp_warnings INTERFACE)
 
-set(NHTTP_WARNING_FLAGS
-	-Wall
-	-Wextra
-	-Wpedantic
-	-Wshadow
-	-Wnon-virtual-dtor
-	-Wold-style-cast
-	-Wcast-align
-	-Woverloaded-virtual
-	-Wconversion
-	-Wsign-conversion
-	-Wnull-dereference
-	-Wdouble-promotion
-)
+if(MSVC)
+	# MSVC's cl.exe doesn't understand GCC/Clang's -W flags at all (no 1:1
+	# equivalents for -Wshadow/-Wold-style-cast/-Wconversion etc. either) —
+	# /W4 + /permissive- (strict conformance) is the closest practical match.
+	# /utf-8 is required, not cosmetic: this repo's UTF-8 source files have no
+	# BOM, so without it cl.exe decodes them using the system's ANSI codepage
+	# (e.g. CP949 on a Korean-locale Windows install) instead of UTF-8, and
+	# every non-ASCII character (em-dashes, arrows, etc. throughout comments)
+	# trips C4819 — fatal under /WX. Found while bringing up the first native
+	# Windows build; see CLAUDE.md's Windows-support notes.
+	set(NHTTP_WARNING_FLAGS /W4 /permissive- /utf-8)
 
-if(NHTTP_WARNINGS_AS_ERRORS)
-	list(APPEND NHTTP_WARNING_FLAGS -Werror)
+	if(NHTTP_WARNINGS_AS_ERRORS)
+		list(APPEND NHTTP_WARNING_FLAGS /WX)
+	endif()
+else()
+	set(NHTTP_WARNING_FLAGS
+		-Wall
+		-Wextra
+		-Wpedantic
+		-Wshadow
+		-Wnon-virtual-dtor
+		-Wold-style-cast
+		-Wcast-align
+		-Woverloaded-virtual
+		-Wconversion
+		-Wsign-conversion
+		-Wnull-dereference
+		-Wdouble-promotion
+	)
+
+	if(NHTTP_WARNINGS_AS_ERRORS)
+		list(APPEND NHTTP_WARNING_FLAGS -Werror)
+	endif()
 endif()
 
 target_compile_options(nhttp_warnings INTERFACE ${NHTTP_WARNING_FLAGS})

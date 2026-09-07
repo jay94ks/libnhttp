@@ -1,6 +1,5 @@
 #include "nhttp/async/socket.hpp"
 
-#include <cerrno>
 #include <system_error>
 #include <utility>
 
@@ -46,65 +45,63 @@ namespace nhttp::async {
 
 	task<std::size_t> async_socket::read_some(void* buf, std::size_t n) {
 		for (;;) {
-			const ssize_t r = handle_.read(buf, n);
+			const std::int64_t r = handle_.read(buf, n);
 
 			if (r >= 0)
 				co_return static_cast<std::size_t>(r);
 
-			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			if (platform::would_block()) {
 				co_await wait_readable();
 				continue;
 			}
 
-			if (errno == EINTR)
+			if (platform::was_interrupted())
 				continue;
 
-			throw std::system_error(errno, std::generic_category(), "read");
+			throw std::system_error(platform::last_socket_error(), std::generic_category(), "read: " + platform::describe_socket_error(platform::last_socket_error()));
 		}
 	}
 
 	task<std::size_t> async_socket::write_some(const void* buf, std::size_t n) {
 		for (;;) {
-			const ssize_t r = handle_.write(buf, n);
+			const std::int64_t r = handle_.write(buf, n);
 
 			if (r >= 0)
 				co_return static_cast<std::size_t>(r);
 
-			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			if (platform::would_block()) {
 				co_await wait_writable();
 				continue;
 			}
 
-			if (errno == EINTR)
+			if (platform::was_interrupted())
 				continue;
 
-			throw std::system_error(errno, std::generic_category(), "write");
+			throw std::system_error(platform::last_socket_error(), std::generic_category(), "write: " + platform::describe_socket_error(platform::last_socket_error()));
 		}
 	}
 
 	task<async_socket> async_socket::accept() {
 		for (;;) {
-			sockaddr_storage addr{};
-			socklen_t len = 0;
-			const int fd = handle_.accept_raw(addr, len);
+			auto accepted = handle_.accept();
 
-			if (fd >= 0)
-				co_return async_socket(*ctx_, platform::socket_handle(fd));
+			if (accepted)
+				co_return async_socket(*ctx_, std::move(accepted->first));
 
-			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			if (platform::would_block()) {
 				co_await wait_readable();
 				continue;
 			}
 
-			if (errno == EINTR)
+			if (platform::was_interrupted())
 				continue;
 
-			throw std::system_error(errno, std::generic_category(), "accept");
+			throw std::system_error(platform::last_socket_error(), std::generic_category(), "accept: " + platform::describe_socket_error(platform::last_socket_error()));
 		}
 	}
 
 	task<bool> async_socket::connect(const platform::endpoint& ep) {
-		const platform::connect_result r = handle_.connect_raw(ep);
+		const platform::connect_result r = handle_.connect(ep);
 
 		if (r == platform::connect_result::failed)
 			co_return false;

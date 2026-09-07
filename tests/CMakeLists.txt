@@ -34,11 +34,14 @@ set(NHTTP_UNIT_TEST_SOURCES
 	unit/test_http_multipart.cpp
 	integration/test_server_basic.cpp
 	integration/test_server_extensions.cpp
+	integration/test_reverse_proxy.cpp
+	integration/test_http2_server.cpp
 	unit/test_router_route.cpp
 	integration/test_router_server.cpp
 	unit/test_ws_sha1_handshake.cpp
 	unit/test_ws_connection.cpp
 	integration/test_websocket_server.cpp
+	unit/test_hpack.cpp
 )
 
 if(NHTTP_ENABLE_TLS)

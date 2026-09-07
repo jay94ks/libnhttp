@@ -20,6 +20,40 @@ namespace nhttp::server {
 		const std::size_t n = pool_.size();
 		platform::endpoint actual_ep = ep;
 
+		// SO_REUSEPORT doesn't exist on Windows — set_reuse_port() reports that
+		// (see platform::socket_handle::set_reuse_port's doc comment) rather
+		// than silently pretending it worked, so this is a real capability
+		// check, not a guess. Where it's unavailable, bind exactly one
+		// listening socket and round-robin accepted connections across workers
+		// explicitly (accept_loop's `distribute` flag) instead of relying on
+		// the kernel to spread them across N independently-bound sockets.
+		platform::socket_handle probe = platform::socket_handle::create(ep.address().version(), platform::transport::tcp);
+
+		if (!probe.valid())
+			return false;
+
+		const bool have_reuseport = probe.set_reuse_port(true);
+		probe.close();
+
+		if (!have_reuseport) {
+			platform::socket_handle handle = platform::socket_handle::create(actual_ep.address().version(), platform::transport::tcp);
+
+			if (!handle.valid())
+				return false;
+
+			handle.set_reuse_address(true);
+
+			if (!handle.bind(actual_ep) || !handle.listen(128))
+				return false;
+
+			if (auto bound = handle.local_endpoint())
+				actual_ep = platform::endpoint(actual_ep.address(), bound->port());
+
+			accept_loop(pool_.context(0), std::move(handle), /* distribute = */ true);
+			bound_endpoint_ = actual_ep;
+			return true;
+		}
+
 		for (std::size_t i = 0; i < n; ++i) {
 			platform::socket_handle handle = platform::socket_handle::create(actual_ep.address().version(), platform::transport::tcp);
 
@@ -39,7 +73,7 @@ namespace nhttp::server {
 					actual_ep = platform::endpoint(actual_ep.address(), bound->port());
 			}
 
-			accept_loop(pool_.context(i), std::move(handle));
+			accept_loop(pool_.context(i), std::move(handle), /* distribute = */ false);
 		}
 
 		bound_endpoint_ = actual_ep;
@@ -55,6 +89,33 @@ namespace nhttp::server {
 
 		const std::size_t n = pool_.size();
 		platform::endpoint actual_ep = ep;
+
+		platform::socket_handle probe = platform::socket_handle::create(ep.address().version(), platform::transport::tcp);
+
+		if (!probe.valid())
+			return false;
+
+		const bool have_reuseport = probe.set_reuse_port(true);
+		probe.close();
+
+		if (!have_reuseport) {
+			platform::socket_handle handle = platform::socket_handle::create(actual_ep.address().version(), platform::transport::tcp);
+
+			if (!handle.valid())
+				return false;
+
+			handle.set_reuse_address(true);
+
+			if (!handle.bind(actual_ep) || !handle.listen(128))
+				return false;
+
+			if (auto bound = handle.local_endpoint())
+				actual_ep = platform::endpoint(actual_ep.address(), bound->port());
+
+			accept_loop_tls(pool_.context(0), std::move(handle), tls_ctx, /* distribute = */ true);
+			tls_bound_endpoint_ = actual_ep;
+			return true;
+		}
 
 		for (std::size_t i = 0; i < n; ++i) {
 			platform::socket_handle handle = platform::socket_handle::create(actual_ep.address().version(), platform::transport::tcp);
@@ -73,7 +134,7 @@ namespace nhttp::server {
 					actual_ep = platform::endpoint(actual_ep.address(), bound->port());
 			}
 
-			accept_loop_tls(pool_.context(i), std::move(handle), tls_ctx);
+			accept_loop_tls(pool_.context(i), std::move(handle), tls_ctx, /* distribute = */ false);
 		}
 
 		tls_bound_endpoint_ = actual_ep;
@@ -107,16 +168,48 @@ namespace nhttp::server {
 		co_return make_response(501);
 	}
 
-	async::task<void> listener::run_connection(async::io_context& ctx, std::shared_ptr<io::stream> wire) {
-		connection conn(std::move(wire), params_, ctx, [this](request& req) { return dispatch(req); });
+	async::task<void> listener::run_connection(async::io_context& ctx, std::shared_ptr<io::stream> wire, std::string initial_buffer) {
+		connection conn(std::move(wire), params_, ctx, [this](request& req) { return dispatch(req); }, std::move(initial_buffer));
 		co_await conn.run();
 	}
 
-	async::detached_task listener::accept_loop(async::io_context& ctx, platform::socket_handle listen_handle) {
+	async::task<void> listener::run_connection_h2(async::io_context& ctx, std::shared_ptr<io::stream> wire, std::string preface_leftover) {
+		connection_h2 conn(std::move(wire), params_, ctx, [this](request& req) { return dispatch(req); }, std::move(preface_leftover));
+		co_await conn.run();
+	}
+
+	async::io_context& listener::pick_worker_round_robin() noexcept {
+		const std::size_t i = next_worker_.fetch_add(1, std::memory_order_relaxed) % pool_.size();
+		return pool_.context(i);
+	}
+
+	async::detached_task listener::dispatch_accepted(async::io_context& target, platform::socket_handle raw) {
+		co_await target.schedule(); // now running on target's own thread.
+
+		async::async_socket sock(target, std::move(raw));
+
+		if (active_connections_.load(std::memory_order_relaxed) >= params_.max_connections) {
+			sock.close();
+			co_return;
+		}
+
+		active_connections_.fetch_add(1, std::memory_order_relaxed);
+		handle_connection(target, std::move(sock));
+	}
+
+	async::detached_task listener::accept_loop(async::io_context& ctx, platform::socket_handle listen_handle, bool distribute) {
 		async::async_socket listen_sock(ctx, std::move(listen_handle));
 
 		for (;;) {
 			async::async_socket client = co_await listen_sock.accept();
+
+			if (distribute) {
+				// hand off before touching active_connections_/max_connections
+				// on the target thread — dispatch_accepted does that check
+				// itself once it's actually running there.
+				dispatch_accepted(pick_worker_round_robin(), platform::socket_handle(client.native().release()));
+				continue;
+			}
 
 			if (active_connections_.load(std::memory_order_relaxed) >= params_.max_connections) {
 				client.close();
@@ -140,7 +233,30 @@ namespace nhttp::server {
 		auto wire = std::make_shared<io::socket_stream>(std::move(sock));
 
 		try {
-			co_await run_connection(ctx, std::move(wire));
+			// peek 4 bytes to distinguish an HTTP/2 prior-knowledge client
+			// (whose connection preface starts "PRI ", a request-line shape
+			// no real HTTP/1.1 method ever produces — RFC 9113 §3.4 chose it
+			// deliberately for exactly this reason) from plain HTTP/1.1.
+			// io::stream has no non-destructive peek, so these bytes are read
+			// for real and hex-identically replayed as whichever driver's
+			// initial buffer — a small, permanent 4-byte read on every
+			// plaintext connection, not just h2 ones.
+			std::string peeked;
+
+			while (peeked.size() < 4) {
+				char buf[4];
+				const std::size_t n = co_await wire->read(buf, 4 - peeked.size());
+
+				if (n == 0)
+					break; // connection closed before enough bytes arrived — let run_connection's own parser report it.
+
+				peeked.append(buf, n);
+			}
+
+			if (peeked == "PRI ")
+				co_await run_connection_h2(ctx, wire, std::move(peeked));
+			else
+				co_await run_connection(ctx, wire, std::move(peeked));
 		}
 		catch (...) {
 			// a single connection's failure must never take down the listener.
@@ -150,11 +266,30 @@ namespace nhttp::server {
 	}
 
 #ifdef NHTTP_HAVE_TLS
-	async::detached_task listener::accept_loop_tls(async::io_context& ctx, platform::socket_handle listen_handle, std::shared_ptr<tls::tls_context> tls_ctx) {
+	async::detached_task listener::dispatch_accepted_tls(async::io_context& target, platform::socket_handle raw, std::shared_ptr<tls::tls_context> tls_ctx) {
+		co_await target.schedule(); // now running on target's own thread.
+
+		async::async_socket sock(target, std::move(raw));
+
+		if (active_connections_.load(std::memory_order_relaxed) >= params_.max_connections) {
+			sock.close();
+			co_return;
+		}
+
+		active_connections_.fetch_add(1, std::memory_order_relaxed);
+		handle_connection_tls(target, std::move(sock), std::move(tls_ctx));
+	}
+
+	async::detached_task listener::accept_loop_tls(async::io_context& ctx, platform::socket_handle listen_handle, std::shared_ptr<tls::tls_context> tls_ctx, bool distribute) {
 		async::async_socket listen_sock(ctx, std::move(listen_handle));
 
 		for (;;) {
 			async::async_socket client = co_await listen_sock.accept();
+
+			if (distribute) {
+				dispatch_accepted_tls(pick_worker_round_robin(), platform::socket_handle(client.native().release()), tls_ctx);
+				continue;
+			}
 
 			if (active_connections_.load(std::memory_order_relaxed) >= params_.max_connections) {
 				client.close();

@@ -2,36 +2,25 @@
 
 #include <algorithm>
 #include <limits>
-#include <stdexcept>
-#include <sys/eventfd.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 namespace nhttp::async {
 
-	io_context::io_context() {
-		wake_fd_ = ::eventfd(0, EFD_NONBLOCK);
-		if (wake_fd_ < 0)
-			throw std::runtime_error("eventfd failed");
-
-		epoll_.add(wake_fd_, EPOLLIN, nullptr);
+	io_context::io_context() : reactor_(platform::make_reactor()) {
 	}
 
 	io_context::~io_context() {
-		if (wake_fd_ >= 0)
-			::close(wake_fd_);
 	}
 
 	void io_context::run() {
 		static constexpr int max_events = 256;
-		epoll_event events[max_events];
+		platform::ready_event events[max_events];
 
 		while (!stopping_.load(std::memory_order_acquire)) {
 			const int timeout_ms = compute_timeout_ms();
-			const int n = epoll_.wait(events, max_events, timeout_ms);
+			const int n = reactor_->wait(events, max_events, timeout_ms);
 
 			if (n > 0)
-				process_ready_epoll_events(events, n);
+				process_ready_events(events, n);
 
 			process_timers();
 			drain_posted();
@@ -40,9 +29,7 @@ namespace nhttp::async {
 
 	void io_context::stop() noexcept {
 		stopping_.store(true, std::memory_order_release);
-
-		const std::uint64_t one = 1;
-		[[maybe_unused]] const ssize_t ignored = ::write(wake_fd_, &one, sizeof(one));
+		reactor_->wake();
 	}
 
 	void io_context::post(std::coroutine_handle<> h) {
@@ -51,8 +38,7 @@ namespace nhttp::async {
 			posted_.push_back(h);
 		}
 
-		const std::uint64_t one = 1;
-		[[maybe_unused]] const ssize_t ignored = ::write(wake_fd_, &one, sizeof(one));
+		reactor_->wake();
 	}
 
 	void io_context::watch_readable(io_registration& reg, std::coroutine_handle<> h) {
@@ -66,46 +52,44 @@ namespace nhttp::async {
 	}
 
 	void io_context::forget(io_registration& reg) noexcept {
-		if (reg.registered_with_epoll)
-			epoll_.remove(reg.fd);
+		if (reg.registered_with_reactor)
+			reactor_->remove(reg.fd);
 
-		reg.registered_with_epoll = false;
+		reg.registered_with_reactor = false;
 		reg.read_waiter = nullptr;
 		reg.write_waiter = nullptr;
-		reg.interest = 0;
+		reg.interest_read = false;
+		reg.interest_write = false;
 	}
 
 	void io_context::update_interest(io_registration& reg) const {
-		std::uint32_t desired = 0;
+		const bool want_read = static_cast<bool>(reg.read_waiter);
+		const bool want_write = static_cast<bool>(reg.write_waiter);
 
-		if (reg.read_waiter)
-			desired |= static_cast<std::uint32_t>(EPOLLIN);
-
-		if (reg.write_waiter)
-			desired |= static_cast<std::uint32_t>(EPOLLOUT);
-
-		if (!reg.registered_with_epoll) {
-			if (desired != 0) {
-				epoll_.add(reg.fd, desired, &reg);
-				reg.registered_with_epoll = true;
-				reg.interest = desired;
+		if (!reg.registered_with_reactor) {
+			if (want_read || want_write) {
+				reactor_->add(reg.fd, want_read, want_write, &reg);
+				reg.registered_with_reactor = true;
+				reg.interest_read = want_read;
+				reg.interest_write = want_write;
 			}
 
 			return;
 		}
 
-		if (desired == reg.interest)
+		if (want_read == reg.interest_read && want_write == reg.interest_write)
 			return;
 
-		if (desired == 0) {
-			epoll_.remove(reg.fd);
-			reg.registered_with_epoll = false;
+		if (!want_read && !want_write) {
+			reactor_->remove(reg.fd);
+			reg.registered_with_reactor = false;
 		}
 		else {
-			epoll_.modify(reg.fd, desired, &reg);
+			reactor_->modify(reg.fd, want_read, want_write, &reg);
 		}
 
-		reg.interest = desired;
+		reg.interest_read = want_read;
+		reg.interest_write = want_write;
 	}
 
 	void io_context::add_timer(std::chrono::steady_clock::time_point deadline, std::coroutine_handle<> h) {
@@ -113,29 +97,22 @@ namespace nhttp::async {
 		std::push_heap(timers_.begin(), timers_.end(), &io_context::timer_later);
 	}
 
-	void io_context::process_ready_epoll_events(epoll_event* events, int count) {
+	void io_context::process_ready_events(const platform::ready_event* events, int count) {
 		for (int i = 0; i < count; ++i) {
-			if (events[i].data.ptr == nullptr) {
-				std::uint64_t value = 0;
-				[[maybe_unused]] const ssize_t ignored = ::read(wake_fd_, &value, sizeof(value));
+			auto* reg = static_cast<io_registration*>(events[i].user_data);
+
+			if (!reg)
 				continue;
-			}
-
-			auto* reg = static_cast<io_registration*>(events[i].data.ptr);
-			const std::uint32_t flags = events[i].events;
-
-			const bool readable = (flags & (static_cast<std::uint32_t>(EPOLLIN) | static_cast<std::uint32_t>(EPOLLHUP) | static_cast<std::uint32_t>(EPOLLERR))) != 0;
-			const bool writable = (flags & (static_cast<std::uint32_t>(EPOLLOUT) | static_cast<std::uint32_t>(EPOLLHUP) | static_cast<std::uint32_t>(EPOLLERR))) != 0;
 
 			std::coroutine_handle<> to_resume_read;
 			std::coroutine_handle<> to_resume_write;
 
-			if (readable && reg->read_waiter) {
+			if (events[i].readable && reg->read_waiter) {
 				to_resume_read = reg->read_waiter;
 				reg->read_waiter = nullptr;
 			}
 
-			if (writable && reg->write_waiter) {
+			if (events[i].writable && reg->write_waiter) {
 				to_resume_write = reg->write_waiter;
 				reg->write_waiter = nullptr;
 			}

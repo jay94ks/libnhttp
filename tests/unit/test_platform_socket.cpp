@@ -22,21 +22,19 @@ TEST_CASE("blocking loopback TCP round trip via socket_handle", "[platform][sock
 	REQUIRE(client.valid());
 
 	endpoint connect_ep(ip_address::loopback_v4(), local->port());
-	REQUIRE(client.connect_raw(connect_ep) == connect_result::connected);
+	REQUIRE(client.connect(connect_ep) == connect_result::connected);
 
-	sockaddr_storage peer_addr{};
-	socklen_t peer_len = 0;
-	int accepted_fd = server.accept_raw(peer_addr, peer_len);
-	REQUIRE(accepted_fd >= 0);
+	auto accepted_pair = server.accept();
+	REQUIRE(accepted_pair.has_value());
 
-	socket_handle accepted(accepted_fd);
+	socket_handle accepted = std::move(accepted_pair->first);
 
 	const char message[] = "hello, nhttp";
-	REQUIRE(client.write(message, sizeof(message)) == static_cast<ssize_t>(sizeof(message)));
+	REQUIRE(client.write(message, sizeof(message)) == static_cast<std::int64_t>(sizeof(message)));
 
 	char buffer[64] = { 0 };
-	ssize_t n = accepted.read(buffer, sizeof(buffer));
-	REQUIRE(n == static_cast<ssize_t>(sizeof(message)));
+	std::int64_t n = accepted.read(buffer, sizeof(buffer));
+	REQUIRE(n == static_cast<std::int64_t>(sizeof(message)));
 	REQUIRE(std::memcmp(buffer, message, sizeof(message)) == 0);
 }
 

@@ -28,7 +28,7 @@ namespace nhttp_test {
 				? nhttp::platform::ip_address::loopback_v4()
 				: nhttp::platform::ip_address::loopback_v6();
 
-			if (sock_.connect_raw(nhttp::platform::endpoint(addr, port)) != nhttp::platform::connect_result::connected)
+			if (sock_.connect(nhttp::platform::endpoint(addr, port)) != nhttp::platform::connect_result::connected)
 				return;
 
 			ctx_ = SSL_CTX_new(TLS_client_method());

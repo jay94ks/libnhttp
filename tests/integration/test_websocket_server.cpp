@@ -61,7 +61,7 @@ namespace {
 	public:
 		raw_ws_client(std::uint16_t port, const std::string& path) {
 			sock_ = socket_handle::create(ip_version::v4, transport::tcp);
-			if (sock_.connect_raw(endpoint(ip_address::loopback_v4(), port)) != connect_result::connected)
+			if (sock_.connect(endpoint(ip_address::loopback_v4(), port)) != connect_result::connected)
 				return;
 
 			const std::string key = "dGhlIHNhbXBsZSBub25jZQ=="; // RFC 6455's own example key
@@ -164,7 +164,7 @@ namespace {
 			std::size_t sent = 0;
 
 			while (sent < data.size()) {
-				const ssize_t n = sock_.write(data.data() + sent, data.size() - sent);
+				const std::int64_t n = sock_.write(data.data() + sent, data.size() - sent);
 				if (n <= 0) break;
 				sent += static_cast<std::size_t>(n);
 			}
@@ -172,7 +172,7 @@ namespace {
 
 		std::string read_some() {
 			char buf[4096];
-			const ssize_t n = sock_.read(buf, sizeof(buf));
+			const std::int64_t n = sock_.read(buf, sizeof(buf));
 			return n > 0 ? std::string(buf, static_cast<std::size_t>(n)) : std::string();
 		}
 
