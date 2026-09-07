@@ -299,6 +299,86 @@ difference from Linux: Windows has no `SO_REUSEPORT` equivalent, so `listener` f
 single accept loop that explicitly round-robins connections across workers there (see the
 architecture overview above) — functionally equivalent, just not kernel-balanced.
 
+## Benchmarks
+
+Static-file throughput was measured against nginx 1.24 and Apache 2.4.58 (event MPM) using
+[wrk](https://github.com/wgtx/wrk), serving an identical deterministic 10&nbsp;KB HTML file, 8
+threads / 200 connections / 30s. Apache's stock `MaxRequestWorkers` (150) was raised to 800
+before measuring — the default caps concurrency well below anything a production deployment
+would run, and left unraised it produced socket errors under this load rather than a meaningful
+number. nhttpd's `blocking_pool_size` (the fixed-size pool that offloads blocking file
+stat/open/read — see `CLAUDE.md`'s architecture decisions, point 3) was likewise raised from its
+default of 4 to 64 for the same reason; the untuned default reaches roughly 10,700 req/s here.
+
+**Two real bugs in this library were found and fixed while running this benchmark** — both are
+now fixed on `main`, and the numbers below reflect the fixed build:
+
+* **`task<T>` leaked its own coroutine frame on every single `co_await`.** `operator co_await()
+  &&` used to null out the task's own `handle_` when handing an `awaiter` to the compiler, so
+  nothing ever destroyed the callee's completed coroutine frame (`final_suspend` only suspends
+  and transfers control to the continuation — see `include/nhttp/async/task.hpp`'s comment for
+  the full mechanics). `task<T>` is the return type of essentially every async function in this
+  codebase, so this leaked on every nested `co_await` in every request — confirmed with a
+  standalone repro (2,000,000 awaited no-op tasks leaked ~125&nbsp;MB) and observed in the wild as
+  ~24&nbsp;KB/request growth serving static files under sustained keep-alive load (233K requests
+  grew RSS from 5.6&nbsp;MB to 5.78&nbsp;GB). Fixed by leaving `handle_` in place so the task
+  object's own destructor — which already correctly calls `handle_.destroy()` — runs at the end
+  of the `co_await` expression's full-expression lifetime, exactly like cppcoro-style task types.
+* **A client that resets a connection mid-response killed the entire server.** A `write()` to an
+  already-reset socket raises `SIGPIPE`, whose default disposition terminates the whole process
+  instantly — no core, nothing for a debugger or sanitizer to catch, which is why this looked like
+  a mysterious silent crash until traced with `strace`. Any sustained-load benchmark reliably
+  triggers it (guaranteed at minimum when the client tears down its connection pool at a run's
+  end). Fixed by ignoring `SIGPIPE` in `listener`'s constructor on POSIX (Windows has no `SIGPIPE`
+  for socket writes — it reports `WSAECONNRESET`/`WSAECONNABORTED` instead); the resulting `EPIPE`
+  from `write()` was already handled correctly as an ordinary closed connection.
+
+### Loopback (same-kernel), post-fix
+
+| Server | Req/s | Avg latency | p50 | p99 |
+|---|---:|---:|---:|---:|
+| nginx 1.24 | 139,431 | 2.39 ms | 0.97 ms | 17.38 ms |
+| Apache 2.4.58 (event MPM, tuned) | 38,584 | 11.54 ms | 5.19 ms | 98.65 ms |
+| nhttpd (this repo, tuned) | 13,818 | 15.18 ms | 13.19 ms | 51.89 ms |
+
+nhttpd is behind both on raw throughput for this specific micro-benchmark (a tiny static file,
+repeatedly, over persistent connections) — expected, and not yet optimized: every request round
+trips through the blocking thread pool multiple times (stat, open, size, read, close), where
+nginx serves the same file via `sendfile()` with zero userspace copies and no thread hop at all.
+See [PLAN.md](PLAN.md) for the concrete plan to close this gap.
+
+### Docker network-stack benchmark
+
+A same-host, same-kernel loopback benchmark understates real-world overhead: Linux's loopback
+interface skips large parts of the normal socket-to-NIC path (no real Ethernet framing, no
+driver queueing, and often no checksum work). `benchmark/docker/` runs the same three servers as
+separate containers on one Docker bridge network, driven by a fourth client container issuing
+`wrk` against each server by its container DNS name — every request crosses a real veth pair and
+Linux bridge, the same kernel code paths a real NIC deployment exercises. All three server
+containers get identical `cpus`/`mem_limit` resource caps so none has an unfair advantage.
+
+Reproduce it:
+
+```bash
+cd benchmark/docker
+docker compose build
+docker compose up -d bench-nginx bench-apache bench-nhttp
+docker compose run --rm bench-client
+```
+
+Results (4 CPUs / 1&nbsp;GiB per server container, otherwise identical parameters to the loopback
+run above):
+
+| Server | Req/s | Avg latency | p50 | p99 |
+|---|---:|---:|---:|---:|
+| nginx 1.24 | 71,216 | 4.18 ms | 2.02 ms | 26.47 ms |
+| Apache 2.4.58 (event MPM, tuned) | 25,705 | 18.10 ms | 7.94 ms | 139.84 ms |
+| nhttpd (this repo, tuned) | 11,170 | 19.36 ms | 15.67 ms | 76.85 ms |
+
+All three containers stayed up and memory-stable for the full run (nhttpd: 11&nbsp;MiB RSS
+after 335K requests) — confirming the coroutine-leak fix holds under real containerized network
+traffic, not just loopback.
+
 ## Design documents
 
 * [CONCEPTS.md](CONCEPTS.md) — the design philosophy and invariants carried forward from the
@@ -308,5 +388,7 @@ architecture overview above) — functionally equivalent, just not kernel-balanc
   spec for "does the new API still let a caller express the same intent."
 * [docs/protocol-extensibility.md](docs/protocol-extensibility.md) — a review of the design
   against the architectural seams HTTP/2 needed (all three held unchanged) and QUIC still would.
+* [PLAN.md](PLAN.md) — the performance-improvement plan to close the gap shown in the Benchmarks
+  section above, prioritized by expected impact.
 * [CLAUDE.md](CLAUDE.md) — the running build/architecture/decisions log for anyone (human or
   otherwise) picking up work on this repo.

@@ -5,11 +5,29 @@
 #include "nhttp/tls/stream.hpp"
 #endif
 
+#if !defined(_WIN32)
+#include <csignal>
+#endif
+
 namespace nhttp::server {
 
 	listener::listener(params p)
 		: params_(p), pool_(p.io_worker_count), blocking_pool_(p.blocking_pool_size)
 	{
+#if !defined(_WIN32)
+		// a write() to a socket the peer has already reset/closed raises
+		// SIGPIPE, whose default disposition is to terminate the *entire*
+		// process instantly (no core, nothing for a debugger/sanitizer to
+		// catch) — found via a sustained wrk benchmark: any client that resets
+		// a connection mid-response (routine under load, and guaranteed when
+		// wrk tears down its connection pool at a run's end) killed the whole
+		// server. Ignoring it here makes those writes fail normally with
+		// EPIPE instead, which the existing socket-error handling already
+		// treats as an ordinary closed connection. Windows has no SIGPIPE for
+		// socket writes (it reports WSAECONNRESET/WSAECONNABORTED instead), so
+		// this is POSIX-only.
+		std::signal(SIGPIPE, SIG_IGN);
+#endif
 	}
 
 	listener::~listener() {

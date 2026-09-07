@@ -691,9 +691,80 @@ zero compiler warnings, **on both platforms**, before moving on.
     concurrently-multiplexed streams read back in the *opposite* order they were requested
     (verifying real interleaving, not just sequential completion). Full suite: 113/113 passing
     warning-free on Linux and Windows.
-- Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8) and Phase 12's noted
-  OpenSSL-on-Windows build-environment gap. Future work on this repo starts from here — see the
-  module map and build instructions above, and `ReadMe.md` for the user-facing API tour.
+- **Phase 15 (benchmarking against nginx/Apache) — done.** At the user's request to benchmark
+  against nginx and Apache 2 and reflect the results in `ReadMe.md`. Found and fixed two real
+  bugs along the way — a sustained-load benchmark is exactly the kind of exercise the existing
+  test suite (dozens of requests per test, not hundreds of thousands) was never going to surface
+  these under, and both are now fixed on `main`, not just noted as known gaps:
+  1. **`task<T>` leaked its own coroutine frame on every single `co_await`, since the very first
+     commit of this rewrite.** `include/nhttp/async/task.hpp`'s `operator co_await() &&` used to
+     `std::exchange(handle_, nullptr)` — handing the callee's coroutine handle to a throwaway
+     `awaiter` that never destroys it, while nulling the task object's own `handle_` so *its*
+     destructor (the only thing that ever calls `handle_.destroy()`) becomes a no-op too.
+     `final_suspend()` only suspends and symmetric-transfers to the continuation; it never
+     destroys the frame either. Net effect: nothing, ever, destroyed a completed task's
+     coroutine frame. Since `task<T>` is the return type of nearly every async function in this
+     codebase, every nested `co_await` anywhere leaked. Caught via a sustained `wrk` benchmark
+     showing static-file-serving RSS grow from 5.6&nbsp;MB to 5.78&nbsp;GB over 233K requests
+     (~24&nbsp;KB/request — plausible given a request chains dozens of `task<T>`-returning calls,
+     several with multi-KB stack-local buffers baked into their coroutine frames, e.g.
+     `write_message_body`'s/`read_headers`'s 4&nbsp;KB scratch buffers). Confirmed in isolation
+     with a minimal repro outside the server entirely: 2,000,000 awaited no-op `task<int>`s
+     leaked ~125&nbsp;MB; after the fix, ~0. **Fix**: stop nulling `handle_` in
+     `operator co_await()`. For the common `co_await foo()` form, `foo()` is a prvalue temporary
+     whose lifetime — ordinary C++ temporary-lifetime rules — extends to the end of the full
+     expression, i.e. past `await_resume()`; leaving `handle_` in place lets the task object's
+     own destructor correctly free the now-completed frame right after, exactly the pattern
+     cppcoro-style task types use. Verified: existing 113/113 tests still pass unchanged (the fix
+     only changes *when* memory is freed, not any observable result — `await_resume()` already
+     extracted results through the awaiter's own copy of the handle in both old and new code), a
+     30s/200-connection sustained benchmark now holds RSS flat (~13&nbsp;MB) instead of
+     ballooning, and grep confirmed nothing in the codebase relies on the old (accidentally
+     early) invalidation of a `task`'s `.valid()`/`.done()` after awaiting it.
+  2. **A client resetting a connection mid-response killed the entire server process, not just
+     that connection.** A `write()` to a socket the peer already reset raises `SIGPIPE`, whose
+     default disposition is to terminate the whole process — instantly, with no core dump and
+     nothing for a debugger or sanitizer to catch (confirmed: an ASan+UBSan build of the exact
+     same binary produced zero sanitizer output when it died this way, and the WSL kernel's own
+     crash capture — which *did* catch fatal signals like `SIGABRT` earlier in this same
+     investigation — logged nothing either). This is what made it look like a mysterious silent
+     crash at first; root-caused by wrapping the server in `strace -f -e trace=exit,exit_group,
+     kill,tkill,tgkill,rt_sigaction`, which showed `+++ killed by SIGPIPE +++` across every
+     thread the instant `wrk` tore down its connection pool at a benchmark run's end — a
+     genuinely routine event under any real load, not an edge case. **Fix**:
+     `std::signal(SIGPIPE, SIG_IGN)` in `listener`'s constructor (POSIX-only —
+     `src/server/listener.cpp`; Windows has no `SIGPIPE` for socket writes, it reports
+     `WSAECONNRESET`/`WSAECONNABORTED` as ordinary error returns instead). The resulting `EPIPE`
+     from a subsequent `write()` was already handled correctly by the existing socket-error path
+     as a closed connection — no other code needed to change. Verified: 113/113 tests still pass,
+     and the same benchmark that used to kill the process within 5–30 seconds now runs
+     426,113 requests over 30s without dying, memory-stable, and answers a `curl` immediately
+     afterward.
+  - **Benchmark methodology**: nginx 1.24 and Apache 2.4.58 (event MPM, `MaxRequestWorkers`
+    raised 150→800 — the stock default caps concurrency well below anything production-tuned)
+    installed via `apt` in this machine's WSL Ubuntu, serving an identical deterministic
+    10&nbsp;KB static HTML file; nhttpd benchmarked via a small standalone `bench_server.cpp`
+    (not `examples/nhttpd`, which binds both loopback stacks and doesn't take a tunable
+    `blocking_pool_size` from the CLI) with `blocking_pool_size` raised 4→64 for the same
+    fairness reason as Apache's tuning. `wrk -t8 -c200 -d30s --latency` in both a same-host
+    loopback configuration and a Docker Compose stack (`benchmark/docker/` — three server
+    containers on one bridge network with identical `cpus`/`mem_limit` caps, driven by a fourth
+    client container issuing `wrk` by container DNS name) — the latter exists because same-kernel
+    loopback benchmarking skips real NIC-path kernel work (framing, driver queueing, checksums)
+    that a Docker bridge network's veth-pair-plus-bridge path actually exercises. Full numbers
+    and reproduction steps are in `ReadMe.md`'s Benchmarks section, not duplicated here.
+  - **Result, honestly**: even after both fixes, nhttpd trails nginx and Apache on this specific
+    micro-benchmark (repeatedly serving one small static file) — 13.8K req/s vs. nginx's 139K and
+    Apache's 38.6K on loopback, same relative gap in the Docker benchmark. This is a real,
+    unoptimized architectural gap (every static-file request round-trips the blocking thread pool
+    several times — stat, open, size, read, close — where nginx uses one zero-copy `sendfile()`
+    call), not a bug, and not addressed in this phase. See [PLAN.md](PLAN.md) for the prioritized
+    plan to close it, written directly from what this benchmarking round found.
+- Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8), Phase 12's noted
+  OpenSSL-on-Windows build-environment gap, and Phase 15's performance-improvement plan
+  ([PLAN.md](PLAN.md)). Future work on this repo starts from here — see the module map and build
+  instructions above, `ReadMe.md` for the user-facing API tour, and `PLAN.md` for what's next on
+  performance specifically.
 
 ## Working style notes for this repo specifically
 

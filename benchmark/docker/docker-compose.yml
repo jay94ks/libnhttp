@@ -1,0 +1,47 @@
+name: nhttp-bench
+
+# All three servers get identical resource limits and sit on the same bridge
+# network (`bench-net`) under fixed DNS names, so the client container's
+# requests to each one cross the exact same docker networking path (veth
+# pair -> bridge -> veth pair) rather than the loopback shortcut a same-host
+# benchmark takes. See ../../ReadMe.md's "Docker network-stack benchmark"
+# section for the full rationale and how to read the results.
+x-server-limits: &server-limits
+  cpus: "4"
+  mem_limit: 1g
+
+services:
+  bench-nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+
+  bench-apache:
+    build:
+      context: .
+      dockerfile: apache/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+
+  bench-nhttp:
+    build:
+      context: ../..
+      dockerfile: benchmark/docker/nhttp/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+
+  bench-client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    cpus: "4"
+    mem_limit: 1g
+    networks: [bench-net]
+    depends_on: [bench-nginx, bench-apache, bench-nhttp]
+    profiles: ["client"]
+
+networks:
+  bench-net:
+    driver: bridge

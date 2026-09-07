@@ -127,7 +127,22 @@ namespace nhttp::async {
 			}
 		};
 
-		awaiter operator co_await() && noexcept { return awaiter{ std::exchange(handle_, nullptr) }; }
+		/* deliberately does NOT null out handle_: the callee's coroutine frame
+		 * finishes at final_suspend (suspended, not destroyed — see
+		 * task_promise_base::final_suspend) and stays alive until *this* task
+		 * object's destructor runs. For the common `co_await foo()` form, `foo()`
+		 * is a prvalue temporary whose lifetime extends to the end of the full
+		 * expression (ordinary C++ temporary-lifetime rules), so its destructor
+		 * — and the frame-freeing `handle_.destroy()` it calls — runs right after
+		 * await_resume() returns the result. Nulling handle_ here (the original,
+		 * now-fixed bug) orphaned that frame: nothing else ever destroys it, so
+		 * every single co_await leaked its callee's coroutine frame permanently
+		 * — found via a sustained-load benchmark showing ~24KB/request growth
+		 * serving static files (each request chains dozens of task<T> awaits),
+		 * confirmed with a standalone repro (2,000,000 awaited no-op tasks leaked
+		 * ~125MB). The awaiter below only borrows the handle to drive
+		 * await_suspend/await_resume; it never owns or destroys it. */
+		awaiter operator co_await() && noexcept { return awaiter{ handle_ }; }
 
 	private:
 		std::coroutine_handle<promise_type> handle_;
