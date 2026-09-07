@@ -16,42 +16,24 @@ are in `ReadMe.md`'s Benchmarks section. Check those first for history — this 
   read/write path. `TransmitFile` is the natural fit, but needs real overlapped-I/O completion
   handling this reactor's plain reads/writes don't currently use; do this once that's designed and
   verifiable, not as a quick add-on.
-- **Real `perf`-based profiling, on a host that can actually run it.** This WSL2 kernel has no
-  matching `linux-tools` package, and `strace -c` is too invasive to stand in for it (see
-  `CLAUDE.md`'s Phase 16 log). A couple of questions from that phase were settled by direct A/B
-  benchmarking instead, which is valid evidence but coarser than a real profile — worth revisiting
-  with `perf` on a native Linux host if further micro-optimization in this area is ever wanted:
-  coroutine-frame allocation churn (P3 in the phase log, reverted for lack of a measured win) and
-  finer-grained `thread_pool` tuning beyond "don't over-provision workers" (P4 in the same log).
-- **`router::route_match()`'s per-candidate backtracking cost.** Everything benchmarked so far
-  (Phase 16) is `overlay`'s static-file path — the `router` module has never been under load in
-  any of these numbers, and code inspection already shows concrete, plausible overhead worth
-  measuring properly before touching:
-  - `route_state` (`include/nhttp/router/route.hpp`) carries its captures in a
-    `std::map<std::string, std::string>` — a red-black tree, so `route_state trial = state;`
-    (taken once per static-child attempt *and* once per candidate in the parameter-children loop,
-    for every trie node visited, not just once per final match — see `route::route_match()`) does
-    a fresh set of node allocations every time, most of which are for branches that end up
-    discarded when backtracking. A route with even one or two path parameters plausibly pays this
-    on every segment of the search, not just the winning path.
-  - `route::route_match()` calls `p->predicate_(std::string(segment))` — an allocating
-    `std::string` construction per parameter-child candidate per segment, purely to satisfy a
-    predicate signature (`std::function<bool(const std::string&)>`) that never actually needs
-    ownership (every real predicate in `USAGE.md`/the example app just compares equality).
-  - Likely lower-impact, worth checking anyway while in this code: `route::method_targets_` is a
-    `std::map<std::string, target_ptr>` keyed by method *name string*, looked up once per matched
-    request via `get_target()` — cheaper than the above since it's O(1) per request instead of
-    O(nodes visited), but still a string-comparing tree lookup where `protocol::http_method`
-    already has a cheaper identity to key on.
-  - **Before changing anything**: this repo's benchmark suite (`benchmark/docker/`,
-    `bench_server.cpp`-style harnesses) only exercises `overlay`, so there's no existing measured
-    baseline for routed requests at all. Extend the benchmark methodology to a router-backed
-    endpoint (e.g., a route with one or two path parameters, matching this codebase's own
-    `:user/profile`-style examples) *first*, establish a baseline, then apply candidate fixes
-    (captures as a small `std::vector<std::pair<...>>` instead of `std::map`; predicates taking
-    `std::string_view`) one at a time and A/B against it — exactly the methodology Phase 16's P3
-    and P4 already validated as necessary (both looked like clear wins on paper; one measured as a
-    real win, two didn't and were reverted).
+- **Real `perf`-based profiling, now that a host to run it on exists.** Phase 16's blocker (no
+  matching `linux-tools` package for this WSL2 kernel) no longer holds — `perf stat` and
+  `perf record -g` both work here now (userspace symbols resolve fine; kernel symbols still
+  don't, which doesn't matter for profiling this codebase's own code). Phase 17 used it for the
+  router item below, but the two specific questions Phase 16 could only settle by A/B benchmarking
+  are still open to revisit with a real profile: coroutine-frame allocation churn (P3, reverted
+  for lack of a measured win) and finer-grained `thread_pool` tuning beyond "don't over-provision
+  workers" (P4) — both in `CLAUDE.md`'s Phase 16 log.
+- **`route::method_targets_`'s string-keyed lookup.** The two more impactful parts of this same
+  item (the `route_state` capture map and the per-candidate predicate allocation) were fixed in
+  Phase 17 (see `CLAUDE.md`'s phase log) after `perf`-profiling `benchmark/router/
+  bench_router_main.cpp` confirmed both as real hotspots. This third, always-lower-priority part
+  is still open: `route::method_targets_` is a `std::map<std::string, target_ptr>` keyed by method
+  *name string*, looked up once per matched request via `get_target()` — cheaper than the other
+  two since it's O(1) per request instead of paid per trie node visited during backtracking, but
+  still a string-comparing tree lookup where `protocol::http_method` has no cheaper identity to
+  key on today. Worth a small enum/id addition to `protocol::http_method` if this is ever measured
+  as worth it — `bench_router_main.cpp` now exists as the baseline to A/B it against.
 
 ## Explicitly out of scope
 

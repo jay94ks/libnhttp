@@ -131,7 +131,7 @@ TEST_CASE("routing picks the deepest matching parameter branch, not the first on
 
 TEST_CASE("a parameter predicate can reject a segment, falling through to another branch", "[router][route]") {
 	auto root = std::make_shared<route>(route_kind::root);
-	root->param(":user", [](const std::string& v) { return v == "jay" || v == "kay"; });
+	root->param(":user", [](std::string_view v) { return v == "jay" || v == "kay"; });
 	root->child("other"); // sibling static branch
 
 	route_state accepted;

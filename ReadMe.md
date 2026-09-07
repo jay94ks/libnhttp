@@ -373,6 +373,46 @@ confirming the coroutine-leak fix holds under real containerized network traffic
 loopback, and that the small default thread/worker counts P1–P4 arrived at are a genuine resource
 efficiency, not just a throughput number.
 
+### Scenario 3: a dynamic, per-request read-modify-write endpoint (PHP comparison)
+
+Both benchmarks above serve a static file — a case nhttpd optimized heavily for (the `sendfile(2)`
+fast path). This scenario compares a genuinely dynamic endpoint instead: one that reads an integer
+out of a file, increments it, writes it back, and responds with the new value, on every single
+request. nhttpd's own handler (`benchmark/docker/nhttp/bench_counter_main.cpp`) does this in
+native C++ (offloaded to `thread_pool`, guarded by a `std::mutex`); nginx+PHP-FPM and
+Apache+mod_php run an equivalent script (`benchmark/docker/php/counter.php`, PHP 8.3, guarded by
+`flock()`) doing the same read-increment-write against the same kind of file. This is deliberately
+**Docker-only** (`benchmark/docker/`, `--profile scenario3`) — there's no loopback variant, since
+the point is a fair, apples-to-apples comparison of three real server stacks under the same
+containerized network path used above, not a raw-syscall microbenchmark.
+
+Reproduce it:
+
+```bash
+cd benchmark/docker
+docker compose build bench-nginx-php bench-apache-php bench-nhttp-counter
+docker compose --profile scenario3 up -d bench-nginx-php bench-apache-php bench-nhttp-counter
+docker compose run --rm bench-client-scenario3
+```
+
+Results (4 CPUs / 1&nbsp;GiB per server container, 8 threads / 200 connections / 30s, same as the
+scenarios above):
+
+| Server | Req/s | Avg latency | p50 | p99 |
+|---|---:|---:|---:|---:|
+| nginx 1.24 + PHP-FPM 8.3 | 3,085 | 86.50 ms | 58.81 ms | 475.23 ms |
+| Apache 2.4 (mpm_prefork) + mod_php 8.3 | 3,474 | 79.82 ms | 46.60 ms | 527.78 ms |
+| **nhttpd (this repo, untuned default)** | **53,619** | **4.59 ms** | **3.05 ms** | **28.97 ms** |
+
+nhttpd is **~15–17× faster** here than either PHP stack — a much larger gap than the static-file
+scenarios, and an expected one: this isn't measuring nginx/Apache's own request handling so much as
+the cost of dispatching into an interpreted scripting layer on every request (PHP-FPM's FastCGI
+round-trip, or mod_php's in-process interpreter invocation) versus nhttpd's handler running as
+plain compiled C++ in the same process that already owns the connection. Apache logged 91 socket
+timeouts out of ~104.7K requests (0.09%) under this load; nginx+PHP-FPM had none. All three
+counters were cross-checked after each run to confirm no lost updates under concurrency (the
+`std::mutex`/`flock()` serialization on each side held).
+
 ## Design documents
 
 * [CONCEPTS.md](CONCEPTS.md) — the design philosophy and invariants carried forward from the

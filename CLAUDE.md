@@ -763,6 +763,88 @@ zero compiler warnings, **on both platforms**, before moving on.
     `benchmark/benchmark-1.jmx` picked up a line-ending-only (LF→CRLF) diff as a side effect of a
     `git stash`/`stash pop` used to A/B-test P4 against the pre-P4 baseline. No content changed;
     reverted via `git checkout` before committing.
+- **Phase 17 (PLAN.md's router item, `perf` becoming usable, and a new PHP-comparison benchmark)
+  — done**, at the user's request to execute everything still open in `PLAN.md` except what it
+  explicitly excludes.
+  - **`perf` now works on this machine's WSL2 kernel** (`perf stat` and `perf record -g` for
+    userspace symbols both verified working — kernel symbols still don't resolve, which is fine,
+    nothing here profiles kernel code) — the blocker PLAN.md recorded in Phase 16 (no matching
+    `linux-tools` package) no longer holds, whether from a WSL2 update or a package having been
+    installed since. This unblocks real profiling instead of only A/B benchmarking for future
+    work in this area; see the router item below for it actually being used this way.
+  - **`router::route_match()`'s backtracking cost (the item PLAN.md flagged for exactly this)**:
+    first, a dedicated benchmark harness was added — `benchmark/router/bench_router_main.cpp`, a
+    minimal router with a static sibling (`users/admin`) competing with a param child (`:id`) at
+    the same trie level, and two more nested param segments below it
+    (`users/:id/posts/:postId/comments/:commentId`) — since no existing benchmark ever put the
+    router under load (Phase 15/16 only ever exercised `overlay`'s static-file path). Profiling
+    this harness with `perf record -g` under `wrk` load **confirmed PLAN.md's hypothesis with
+    real data**: `malloc`/`cfree`/`_int_free`/`_int_malloc`/`operator new`/`operator delete` and
+    several `std::_Rb_tree` construct/copy/erase symbols together accounted for roughly 10%+ of
+    sampled CPU time, exactly the allocation churn PLAN.md's code-inspection predicted from
+    `route_state trial = state;` copying a `std::map<std::string,std::string>` on every trie
+    candidate tried (not just the winning path) and from `p->predicate_(std::string(segment))`
+    allocating a string per parameter-child candidate purely to satisfy a signature that never
+    needed ownership. Both were fixed exactly as PLAN.md proposed: `route_state::captures` is now
+    a small hand-written `capture_map` (`include/nhttp/router/route.hpp`) — a linearly-scanned
+    `std::vector<std::pair<std::string,std::string>>` behind the same `at()`/`count()`/`empty()`/
+    `operator[]` interface `std::map` had, so no call site (examples, tests, the new benchmark)
+    needed to change its usage, only its predicate lambda's parameter type — and every
+    `param(...)` predicate across `facade`/`route`/`router`/`group_proxy` now takes
+    `std::string_view` instead of `const std::string&`, so `route::route_match()` calls it
+    directly on the segment with no allocation at all. `route::method_targets_`'s string-keyed
+    lookup (PLAN.md's third, explicitly "likely lower-impact" bullet) was deliberately left
+    alone — it's an O(1)-per-request cost, not paid per trie node visited like the other two, and
+    `protocol::http_method` has no cheaper identity to key on today without a larger API change;
+    still open if ever worth it.
+    - **A/B methodology note, worth keeping for next time**: the first A/B attempt — alternating
+      baseline/optimized runs of `wrk -t8 -c200` on this 8-thread (4-core) machine, with both the
+      server and `wrk` itself contending for the same 8 logical CPUs — was too noisy to read at
+      all (the "optimized" build measured *slower* in 3 of 4 interleaved trials). Pinning the
+      server to CPUs 0-3 and `wrk` to CPUs 4-7 via `taskset` (and running 5 trials of each build
+      back-to-back rather than interleaved) turned that into a small but consistent win: median
+      97,085 req/s optimized vs. 93,998 req/s baseline (mean 96,922 vs. 91,169) on the deepest
+      route (`users/:id/posts/:postId/comments/:commentId`, three captures). A modest result, but
+      directionally consistent across every summary statistic once CPU contention noise was
+      controlled for — combined with the allocation-churn evidence from `perf`, this was kept
+      rather than reverted (unlike P3/P4's first attempts in Phase 16, which showed *no* direction
+      or a *consistent regression* even after controlling for noise).
+    - Full suite verified passing warning-free on **both** platforms after this change: 119/119 on
+      Linux/WSL, 115/115 on native Windows/MSVC (test counts differ from Phase 16's 113/113 simply
+      because the suite has grown since; not a regression).
+  - **A new benchmark scenario, added at the user's request, comparing a genuinely dynamic
+    endpoint (not a static file) against PHP**: `benchmark/docker/nhttp/bench_counter_main.cpp`
+    (an endpoint that reads an integer out of a file, increments it, writes it back, and responds
+    with the new value — offloaded to `thread_pool`, serialized by a plain `std::mutex` since the
+    whole server is one process) versus `benchmark/docker/php/counter.php` (an equivalent script,
+    serialized by `flock()`) run under **nginx 1.27-alpine + PHP-FPM 8.3** (`benchmark/docker/
+    nginx-php/`) and **`php:8.3-apache` (mpm_prefork + mod_php)** (`benchmark/docker/apache-php/`)
+    — mod_php requires a non-threaded MPM, so prefork (not the event MPM the static-file
+    benchmark's plain Apache uses) is the correct, standard real-world choice here, not a
+    benchmark-only compromise. New `docker-compose.yml` services (`bench-nginx-php`,
+    `bench-apache-php`, `bench-nhttp-counter`, `bench-client-scenario3`) gated behind a
+    `scenario3` compose profile, per the user's explicit instruction that this benchmark only
+    ever runs inside Docker — no loopback variant exists for it, unlike the other two benchmarks.
+    - **Real numbers, current `main`** (4 CPUs/1&nbsp;GiB per container, 8t/200c/30s, same
+      resource limits as the other Docker benchmark): nhttpd **53,619 req/s** vs. nginx+PHP-FPM's
+      **3,085 req/s** and Apache+mod_php's **3,474 req/s** — roughly **15-17× faster**, a much
+      larger gap than the static-file scenarios, and an expected one: this mostly measures the
+      cost of dispatching into an interpreted scripting layer per request (FastCGI round-trip or
+      an in-process PHP interpreter invocation) against a compiled C++ handler in the same
+      process that already owns the connection, not nginx/Apache's own request-handling quality.
+      All three counters were read back after each run and cross-checked against expected request
+      counts to confirm no lost updates under concurrency (both sides' locking held). Full results
+      and reproduction steps are in `ReadMe.md`'s Benchmarks section.
+    - **A packaging gotcha hit while building this**: `nginx:1.24-alpine` (Alpine 3.17) has no
+      `php83`/`php83-fpm` package — Alpine only ships versioned PHP packages, and 3.17's repos top
+      out at `php81`. Switched to `nginx:1.27-alpine` (a newer Alpine base) specifically so both
+      PHP targets run the same PHP 8.3, rather than quietly comparing PHP 8.1 against 8.3.
+    - **A real config bug found and fixed while bringing this up**: `php:8.3-apache`'s
+      `mpm_prefork` config (unlike `mpm_event`, which the static-file Apache benchmark already
+      tunes in `benchmark/docker/apache/mpm_event.conf`) needs `ServerLimit` raised alongside
+      `MaxRequestWorkers` — Apache silently clamps `MaxRequestWorkers` down to the default
+      `ServerLimit` of 256 otherwise (logged as a startup warning, easy to miss). Fixed in
+      `benchmark/docker/apache-php/mpm_prefork_bench.conf`.
 - Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8), Phase 12's noted
   OpenSSL-on-Windows build-environment gap, and whatever `PLAN.md` currently tracks as open.
   Future work on this repo starts from here — see the module map and build instructions above,

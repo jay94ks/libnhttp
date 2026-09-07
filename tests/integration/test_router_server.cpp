@@ -109,7 +109,7 @@ TEST_CASE("router param() predicate constrains which values a parameter accepts"
 	r->get("/:user", target_by([](request& req) {
 		return make_response(route_of(req).captures.at(":user") + " is allowed");
 	}));
-	r->param(":user", [](const std::string& v) { return v == "jay" || v == "kay"; });
+	r->param(":user", [](std::string_view v) { return v == "jay" || v == "kay"; });
 
 	server.srv.extends(r);
 

@@ -33,7 +33,7 @@ namespace nhttp::router {
 		std::shared_ptr<facade> any(const std::string& path, target_ptr t) override;
 		std::shared_ptr<facade> method(const protocol::http_method& m, target_ptr t) override;
 		std::shared_ptr<facade> method(const protocol::http_method& m, const std::string& path, target_ptr t) override;
-		std::shared_ptr<facade> param(const std::string& name, std::function<bool(const std::string&)> predicate) override;
+		std::shared_ptr<facade> param(const std::string& name, std::function<bool(std::string_view)> predicate) override;
 		std::shared_ptr<facade> prepend(middleware_ptr m) override;
 		std::shared_ptr<facade> append(middleware_ptr m) override;
 		std::shared_ptr<facade> group(std::function<void(std::shared_ptr<facade>)> body) override;

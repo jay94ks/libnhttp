@@ -376,6 +376,45 @@ Apache를 확실히 앞서고, nginx의 6분의 1이 아니라 대략 3분의 2 
 유효함을, 그리고 P1~P4가 도달한 작은 기본 스레드/워커 수가 단순한 처리량 숫자가 아니라
 실제 자원 효율임을 확인했습니다.
 
+### 시나리오 3: 요청마다 읽고-바꾸고-쓰는 동적 엔드포인트 (PHP 비교)
+
+위 두 벤치마크는 전부 정적 파일 서빙입니다 — nhttpd가 (`sendfile(2)` 고속 경로로) 집중적으로
+최적화해둔 케이스죠. 이 시나리오는 진짜 동적인 엔드포인트를 비교합니다: 요청마다 파일에서
+정수를 읽고, 1 증가시키고, 다시 써서, 새 값을 응답하는 엔드포인트입니다. nhttpd 자신의
+핸들러(`benchmark/docker/nhttp/bench_counter_main.cpp`)는 이걸 네이티브 C++로 처리하고
+(`thread_pool`로 오프로드, `std::mutex`로 보호), nginx+PHP-FPM과 Apache+mod_php는 같은 종류의
+파일에 대해 같은 읽기-증가-쓰기를 하는 동등한 스크립트(`benchmark/docker/php/counter.php`,
+PHP 8.3, `flock()`으로 보호)를 실행합니다. 이 벤치마크는 일부러 **Docker 전용**으로만
+구동됩니다(`benchmark/docker/`, `--profile scenario3`) — 루프백 버전은 없습니다: 목적이 순수
+시스템 콜 마이크로벤치마크가 아니라, 위 시나리오들과 같은 컨테이너 네트워크 경로 위에서 세
+서버 스택을 공평하게 비교하는 것이기 때문입니다.
+
+재현 방법:
+
+```bash
+cd benchmark/docker
+docker compose build bench-nginx-php bench-apache-php bench-nhttp-counter
+docker compose --profile scenario3 up -d bench-nginx-php bench-apache-php bench-nhttp-counter
+docker compose run --rm bench-client-scenario3
+```
+
+결과(서버 컨테이너당 4 CPU / 1&nbsp;GiB, 8 스레드 / 200 커넥션 / 30초, 위 시나리오들과 동일):
+
+| 서버 | Req/s | 평균 지연시간 | p50 | p99 |
+|---|---:|---:|---:|---:|
+| nginx 1.24 + PHP-FPM 8.3 | 3,085 | 86.50 ms | 58.81 ms | 475.23 ms |
+| Apache 2.4 (mpm_prefork) + mod_php 8.3 | 3,474 | 79.82 ms | 46.60 ms | 527.78 ms |
+| **nhttpd (이 저장소, 튜닝 없음/기본값)** | **53,619** | **4.59 ms** | **3.05 ms** | **28.97 ms** |
+
+nhttpd가 여기서는 **약 15~17배** 더 빠릅니다 — 정적 파일 시나리오들보다 훨씬 큰 차이인데,
+당연한 결과이기도 합니다: 이건 사실 nginx/Apache 자체의 요청 처리 능력을 재는 게 아니라,
+요청마다 인터프리터 스크립팅 레이어로 진입하는 비용(PHP-FPM의 FastCGI 왕복, 또는 mod_php의
+프로세스 내 인터프리터 호출)과, 이미 그 커넥션을 소유하고 있는 프로세스 안에서 그냥 컴파일된
+C++로 도는 nhttpd 핸들러를 비교하는 것에 가깝습니다. 이 부하에서 Apache는 약 104.7천 요청 중
+91건(0.09%)의 소켓 타임아웃을 기록했고, nginx+PHP-FPM은 하나도 없었습니다. 세 카운터 모두 각
+실행 후 값을 확인해서 동시성 아래서도 갱신 유실이 없었음을(양쪽의 `std::mutex`/`flock()`
+직렬화가 제대로 버텼음을) 교차 검증했습니다.
+
 ## 설계 문서
 
 * [CONCEPTS.md](CONCEPTS.ko.md) — 원래 구현으로부터 계승한 설계 철학과 불변조건들, 그리고 원래

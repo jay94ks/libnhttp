@@ -33,7 +33,7 @@ namespace nhttp::router {
 		return shared_from_this();
 	}
 
-	std::shared_ptr<facade> router::param(const std::string& name, std::function<bool(const std::string&)> predicate) {
+	std::shared_ptr<facade> router::param(const std::string& name, std::function<bool(std::string_view)> predicate) {
 		root_->param(name, std::move(predicate));
 		return shared_from_this();
 	}

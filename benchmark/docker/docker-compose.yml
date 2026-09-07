@@ -42,6 +42,48 @@ services:
     depends_on: [bench-nginx, bench-apache, bench-nhttp]
     profiles: ["client"]
 
+  # --- scenario 3: a dynamic, per-request read-modify-write endpoint ---
+  # (see ReadMe.md's Benchmarks section) -- nginx+php-fpm and Apache+mod_php
+  # running counter.php against nhttp's own equivalent handler. Gated behind
+  # the "scenario3" profile so the default `docker compose up` above (the
+  # static-file benchmark) is unaffected.
+  bench-nginx-php:
+    build:
+      context: .
+      dockerfile: nginx-php/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+    profiles: ["scenario3"]
+
+  bench-apache-php:
+    build:
+      context: .
+      dockerfile: apache-php/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+    profiles: ["scenario3"]
+
+  bench-nhttp-counter:
+    build:
+      context: ../..
+      dockerfile: benchmark/docker/nhttp-counter/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+    profiles: ["scenario3"]
+
+  bench-client-scenario3:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    cpus: "4"
+    mem_limit: 1g
+    networks: [bench-net]
+    depends_on: [bench-nginx-php, bench-apache-php, bench-nhttp-counter]
+    profiles: ["scenario3"]
+    entrypoint: ["bash", "/scenario3.sh"]
+    volumes:
+      - ./client/run_scenario3.sh:/scenario3.sh:ro
+
 networks:
   bench-net:
     driver: bridge

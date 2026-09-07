@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace nhttp::router {
 
@@ -30,7 +31,7 @@ namespace nhttp::router {
 		virtual std::shared_ptr<facade> method(const protocol::http_method& m, const std::string& path, target_ptr t) = 0;
 
 		/* sets a predicate constraining an existing ":name" parameter segment. */
-		virtual std::shared_ptr<facade> param(const std::string& name, std::function<bool(const std::string&)> predicate) = 0;
+		virtual std::shared_ptr<facade> param(const std::string& name, std::function<bool(std::string_view)> predicate) = 0;
 
 		virtual std::shared_ptr<facade> prepend(middleware_ptr m) = 0;
 		virtual std::shared_ptr<facade> append(middleware_ptr m) = 0;

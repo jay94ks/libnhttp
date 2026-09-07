@@ -758,6 +758,88 @@ ctest --test-dir build-win --output-on-failure
   - **무관한 이상 현상, 발견 후 바로잡음**: `.gitignore`, `LICENSE`,
     `benchmark/benchmark-1.jmx`가 P4를 기준선과 A/B 비교하는 데 쓴 `git stash`/`stash pop`의
     부작용으로 줄바꿈만(LF→CRLF) 바뀜. 내용 변경 없음; 커밋 전 `git checkout`으로 되돌림.
+- **Phase 17(PLAN.md의 router 항목, `perf` 사용 가능해짐, 그리고 새 PHP 비교 벤치마크) — 완료.**
+  사용자의 요청으로, `PLAN.md`에 아직 남아 있던 것들을 명시적으로 제외된 것을 빼고 전부
+  실행했습니다.
+  - **`perf`가 이제 이 머신의 WSL2 커널에서 동작합니다** (`perf stat`과 유저스페이스 심볼용
+    `perf record -g` 둘 다 동작 확인 — 커널 심볼은 여전히 안 풀리는데, 여기서는 커널 코드를
+    프로파일링하는 게 아니니 상관없습니다) — Phase 16이 기록한 걸림돌(맞는 `linux-tools`
+    패키지가 없던 것)이 더 이상 유효하지 않습니다. WSL2 업데이트 때문인지 그사이 패키지가
+    설치된 건지는 알 수 없지만, 어느 쪽이든 이제 A/B 벤치마크뿐 아니라 실제 프로파일링이
+    가능해졌습니다 — 아래 router 항목이 실제로 이렇게 쓰인 예입니다.
+  - **`router::route_match()`의 백트래킹 비용(PLAN.md가 정확히 이걸 위해 표시해둔 항목)**:
+    먼저 전용 벤치마크 하네스를 추가했습니다 — `benchmark/router/bench_router_main.cpp`, 같은
+    트라이 레벨에서 정적 형제(`users/admin`)와 파라미터 자식(`:id`)이 경쟁하고, 그 아래로
+    파라미터 세그먼트 두 개가 더 중첩된(`users/:id/posts/:postId/comments/:commentId`) 최소
+    라우터입니다 — 기존 벤치마크는 하나도 router를 부하 아래 둬본 적이 없었기 때문입니다
+    (Phase 15/16은 전부 `overlay`의 정적 파일 경로만 썼습니다). 이 하네스를 `wrk` 부하 아래
+    `perf record -g`로 프로파일링하니 **실제 데이터로 PLAN.md의 가설이 확인됐습니다**:
+    `malloc`/`cfree`/`_int_free`/`_int_malloc`/`operator new`/`operator delete`와 여러
+    `std::_Rb_tree` construct/copy/erase 심볼들을 합치면 샘플링된 CPU 시간의 10% 이상을
+    차지했는데, 이는 PLAN.md가 코드만 보고 예측했던 바로 그 할당 처리량입니다: `route_state
+    trial = state;`가 (승리한 경로뿐 아니라) 시도하는 모든 트라이 후보마다
+    `std::map<std::string,std::string>`을 복사하는 것, 그리고 `p->predicate_(std::string
+    (segment))`가 소유권이 전혀 필요 없는 시그니처를 만족시키려고 파라미터 자식 후보마다
+    문자열을 할당하는 것. 둘 다 PLAN.md가 제안한 그대로 고쳤습니다: `route_state::captures`는
+    이제 작은 손수 짠 `capture_map`(`include/nhttp/router/route.hpp`)입니다 — `std::map`이
+    갖고 있던 것과 똑같은 `at()`/`count()`/`empty()`/`operator[]` 인터페이스 뒤에 선형 스캔하는
+    `std::vector<std::pair<std::string,std::string>>`을 숨긴 것이라, 어떤 호출부(예제, 테스트,
+    새 벤치마크)도 predicate 람다의 매개변수 타입 말고는 사용법을 바꿀 필요가 없었습니다. 그리고
+    `facade`/`route`/`router`/`group_proxy` 전체의 모든 `param(...)` predicate가 이제
+    `const std::string&` 대신 `std::string_view`를 받아서, `route::route_match()`가 세그먼트에
+    대해 할당 없이 바로 호출할 수 있습니다. `route::method_targets_`의 문자열 키 조회
+    (PLAN.md의 세 번째, 처음부터 "아마 영향은 더 작을 것"이라던 항목)는 일부러 그대로 뒀습니다 —
+    다른 둘처럼 방문하는 트라이 노드마다 치르는 비용이 아니라 요청당 O(1) 비용이고,
+    `protocol::http_method`가 더 큰 API 변경 없이는 오늘 시점에 더 저렴한 식별자를 갖고 있지
+    않기 때문입니다; 언젠가 해볼 가치가 있다면 여전히 열려 있습니다.
+    - **다음을 위해 남겨둘 A/B 방법론 메모**: 이 8스레드(4코어) 머신에서 서버와 `wrk` 자신이
+      같은 8개의 논리 CPU를 두고 경쟁하는 채로 baseline/optimized를 번갈아 `wrk -t8 -c200`
+      돌린 첫 A/B 시도는 너무 노이즈가 심해서 읽을 수가 없었습니다("최적화된" 빌드가 번갈아
+      돌린 4번 중 3번에서 오히려 더 느리게 측정됐습니다). `taskset`으로 서버는 CPU 0-3에,
+      `wrk`는 CPU 4-7에 고정하고(그리고 번갈아가 아니라 각 빌드를 5번씩 연달아 돌리고) 나니
+      작지만 일관된 개선으로 바뀌었습니다: 가장 깊은 라우트(`users/:id/posts/:postId/
+      comments/:commentId`, 캡처 3개)에서 중앙값 기준 최적화 97,085 req/s 대 기준 93,998
+      req/s(평균 96,922 대 91,169). 수수한 결과이지만, CPU 경합 노이즈를 통제하고 나니 모든
+      요약 통계에서 방향이 일관됐습니다 — `perf`가 보여준 할당 처리량 증거와 합쳐서, 이건
+      반려하지 않고 유지했습니다(노이즈를 통제한 뒤에도 방향이 아예 없거나 *일관되게
+      퇴보*했던 Phase 16의 P3/P4 첫 시도들과는 다릅니다).
+    - 이 변경 후 두 플랫폼 **모두**에서 전체 스위트가 경고 없이 통과함을 확인했습니다: 리눅스/
+      WSL 119/119, 네이티브 Windows/MSVC 115/115(테스트 개수가 Phase 16의 113/113과 다른 건
+      그사이 스위트가 늘어서일 뿐, 퇴보가 아닙니다).
+  - **사용자의 요청으로 추가한 새 벤치마크 시나리오, PHP와 비교한 진짜 동적 엔드포인트(정적
+    파일이 아닌)**: `benchmark/docker/nhttp/bench_counter_main.cpp`(파일에서 정수를 읽어서
+    증가시키고 다시 쓴 뒤 새 값을 응답하는 엔드포인트 — `thread_pool`로 오프로드되고, 서버
+    전체가 프로세스 하나이므로 그냥 `std::mutex`로 직렬화)를 `benchmark/docker/php/
+    counter.php`(동등한 스크립트, `flock()`으로 직렬화)와 **nginx 1.27-alpine + PHP-FPM
+    8.3**(`benchmark/docker/nginx-php/`) 및 **`php:8.3-apache`(mpm_prefork + mod_php)**
+    (`benchmark/docker/apache-php/`) 위에서 비교했습니다 — mod_php는 스레드 안전하지 않은
+    MPM을 요구하므로, 정적 파일 벤치마크의 순정 Apache가 쓰는 event MPM이 아니라 prefork가
+    여기서는 벤치마크만을 위한 타협이 아니라 정확하고 표준적인 실제 선택입니다. 새
+    `docker-compose.yml` 서비스들(`bench-nginx-php`, `bench-apache-php`,
+    `bench-nhttp-counter`, `bench-client-scenario3`)은 `scenario3` compose 프로파일 뒤에
+    묶여 있는데, 이 벤치마크는 오직 Docker 안에서만 구동해야 한다는 사용자의 명시적 지시에
+    따른 것입니다 — 다른 두 벤치마크와 달리 루프백 버전은 없습니다.
+    - **실제 수치, 현재 `main`** (컨테이너당 4 CPU/1&nbsp;GiB, 8스레드/200커넥션/30초,
+      다른 Docker 벤치마크와 동일한 자원 제한): nhttpd **53,619 req/s** 대 nginx+PHP-FPM의
+      **3,085 req/s**, Apache+mod_php의 **3,474 req/s** — 대략 **15~17배** 더 빠른데, 정적
+      파일 시나리오들보다 훨씬 큰 차이이고 당연한 결과이기도 합니다: 이건 사실상 nginx/Apache
+      자체의 요청 처리 품질이 아니라, 요청마다 인터프리터 스크립팅 레이어로 진입하는 비용
+      (FastCGI 왕복 또는 프로세스 내 PHP 인터프리터 호출)과 이미 그 커넥션을 소유한 프로세스
+      안에서 그냥 도는 컴파일된 C++ 핸들러를 비교하는 것입니다. 세 카운터 모두 각 실행 후
+      값을 읽어서 예상 요청 수와 교차 검증해 동시성 아래 갱신 유실이 없었음을(양쪽의 락이
+      제대로 버텼음을) 확인했습니다. 전체 결과와 재현 방법은 `ReadMe.md`의 벤치마크 섹션에
+      있습니다.
+    - **이걸 만들다 부딪힌 패키징 함정**: `nginx:1.24-alpine`(Alpine 3.17)에는 `php83`/
+      `php83-fpm` 패키지가 없습니다 — Alpine은 버전이 붙은 PHP 패키지만 배포하는데, 3.17의
+      저장소는 `php81`까지밖에 없습니다. 두 PHP 타겟이 조용히 PHP 8.1 대 8.3을 비교하게
+      되는 대신 둘 다 같은 PHP 8.3을 쓰도록, 일부러 더 새로운 Alpine 베이스인
+      `nginx:1.27-alpine`으로 바꿨습니다.
+    - **이걸 띄우다가 발견해서 고친 진짜 설정 버그**: `php:8.3-apache`의 `mpm_prefork` 설정은
+      (정적 파일 Apache 벤치마크가 이미 `benchmark/docker/apache/mpm_event.conf`에서 튜닝해둔
+      `mpm_event`와 달리) `MaxRequestWorkers`와 함께 `ServerLimit`도 올려야 합니다 — 안 그러면
+      Apache가 `MaxRequestWorkers`를 기본 `ServerLimit`인 256으로 조용히 깎아버립니다(시작
+      시 경고로만 로그에 남아서 놓치기 쉽습니다). `benchmark/docker/apache-php/
+      mpm_prefork_bench.conf`에서 고쳤습니다.
 - 계획에 남은 것은 QUIC/HTTP-3(보류, 결정 #8 참고), Phase 12가 기록한 Windows에서의 OpenSSL
   빌드 환경 공백, 그리고 PLAN.md가 현재 추적하는 것들뿐입니다. 이 저장소의 향후 작업은
   여기서부터 시작합니다 — 위의 모듈 맵과 빌드 안내, 사용자 대상 API 투어는 `ReadMe.md`,

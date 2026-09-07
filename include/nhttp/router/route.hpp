@@ -2,15 +2,70 @@
 
 #include "facade.hpp"
 
-#include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace nhttp::router {
 
 	enum class route_kind { root, static_segment, param, wildcard };
+
+	/**
+	 * flat map for route captures. a real request has at most a handful of
+	 * ":name" captures, and route_match() copies a route_state on every trie
+	 * candidate it tries (most of which get discarded on backtrack — see
+	 * CONCEPTS.md §5 and PLAN.md's router item) — a std::map<string,string>
+	 * paid for a fresh set of red-black-tree node allocations on every one of
+	 * those copies, confirmed as a real hotspot via `perf` profiling
+	 * (benchmark/router/bench_router_main.cpp). A linearly-scanned
+	 * std::vector<pair<string,string>> is both cheaper to copy (one
+	 * allocation, not one per entry) and faster to scan at this size than a
+	 * tree lookup.
+	 */
+	class capture_map {
+	public:
+		using value_type = std::pair<std::string, std::string>;
+		using const_iterator = std::vector<value_type>::const_iterator;
+
+		std::string& operator[](std::string_view key) {
+			for (value_type& kv : items_) {
+				if (kv.first == key)
+					return kv.second;
+			}
+
+			items_.emplace_back(std::string(key), std::string());
+			return items_.back().second;
+		}
+
+		const std::string& at(std::string_view key) const {
+			for (const value_type& kv : items_) {
+				if (kv.first == key)
+					return kv.second;
+			}
+
+			throw std::out_of_range("capture_map::at: no such key");
+		}
+
+		std::size_t count(std::string_view key) const noexcept {
+			for (const value_type& kv : items_) {
+				if (kv.first == key)
+					return 1;
+			}
+
+			return 0;
+		}
+
+		bool empty() const noexcept { return items_.empty(); }
+		std::size_t size() const noexcept { return items_.size(); }
+		const_iterator begin() const noexcept { return items_.begin(); }
+		const_iterator end() const noexcept { return items_.end(); }
+
+	private:
+		std::vector<value_type> items_;
+	};
 
 	/**
 	 * per-match state threaded through route::route_match: captured ":name"
@@ -20,7 +75,7 @@ namespace nhttp::router {
 	 * encodes, and CONCEPTS.md §5 for why it matters).
 	 */
 	struct route_state {
-		std::map<std::string, std::string> captures;
+		capture_map captures;
 		int depth = 0;
 	};
 
@@ -63,7 +118,7 @@ namespace nhttp::router {
 		std::shared_ptr<facade> any(const std::string& path, target_ptr t) override;
 		std::shared_ptr<facade> method(const protocol::http_method& m, target_ptr t) override;
 		std::shared_ptr<facade> method(const protocol::http_method& m, const std::string& path, target_ptr t) override;
-		std::shared_ptr<facade> param(const std::string& name, std::function<bool(const std::string&)> predicate) override;
+		std::shared_ptr<facade> param(const std::string& name, std::function<bool(std::string_view)> predicate) override;
 		std::shared_ptr<facade> prepend(middleware_ptr m) override;
 		std::shared_ptr<facade> append(middleware_ptr m) override;
 		std::shared_ptr<facade> group(std::function<void(std::shared_ptr<facade>)> body) override;
@@ -78,7 +133,7 @@ namespace nhttp::router {
 	private:
 		route_kind kind_;
 		std::string name_; // for param/wildcard nodes, includes the leading ':' or is "*"
-		std::function<bool(const std::string&)> predicate_; // param nodes only
+		std::function<bool(std::string_view)> predicate_; // param nodes only
 
 		std::vector<route_ptr> static_children_; // sorted by name for binary search
 		std::vector<route_ptr> param_children_;

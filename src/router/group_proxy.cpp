@@ -27,7 +27,7 @@ namespace nhttp::router {
 		return shared_from_this();
 	}
 
-	std::shared_ptr<facade> group_proxy::param(const std::string& name, std::function<bool(const std::string&)> predicate) {
+	std::shared_ptr<facade> group_proxy::param(const std::string& name, std::function<bool(std::string_view)> predicate) {
 		inner_->param(name, std::move(predicate));
 		return shared_from_this();
 	}

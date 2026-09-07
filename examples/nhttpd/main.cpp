@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
 			return make_response(route_of(req).captures.at(":user") + " deleted!");
 		}));
 
-		inner->param(":user", [](const std::string& name) {
+		inner->param(":user", [](std::string_view name) {
 			return name == "jay" || name == "kay";
 		});
 	});

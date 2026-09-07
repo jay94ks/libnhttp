@@ -116,7 +116,7 @@ namespace nhttp::router {
 		bool have_best = false;
 
 		for (const route_ptr& p : param_children_) {
-			if (p->predicate_ && !p->predicate_(std::string(segment)))
+			if (p->predicate_ && !p->predicate_(segment))
 				continue;
 
 			route_state trial = state;
@@ -181,7 +181,7 @@ namespace nhttp::router {
 		return shared_from_this();
 	}
 
-	std::shared_ptr<facade> route::param(const std::string& name, std::function<bool(const std::string&)> predicate) {
+	std::shared_ptr<facade> route::param(const std::string& name, std::function<bool(std::string_view)> predicate) {
 		const route_ptr node = child(name);
 		node->predicate_ = std::move(predicate);
 		return shared_from_this();
