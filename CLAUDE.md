@@ -31,6 +31,12 @@ carry forward. If you need to know "how did the old code do X," read `CONCEPTS.m
 first — they're the curated summary; only dig into `libnhttp/nhttp/**` directly for something
 those two docs don't cover.
 
+A third document looks forward instead of back: [`PLAN.md`](PLAN.md) is the prioritized
+performance-improvement plan written after Phase 15's benchmark round (see that phase's entry
+below) found nhttpd well behind nginx/Apache serving static files. If you're picking up
+performance work on this repo, start there rather than re-deriving priorities from scratch —
+it's ordered by expected impact vs. effort and explains why each item is scoped the way it is.
+
 The full redesign plan (architecture + phased build order) lives at
 `C:\Users\jay94\.claude\plans\dazzling-fluttering-badger.md` on the machine this was planned on
 — it won't be present in a fresh clone, so the summary below is the durable record.
