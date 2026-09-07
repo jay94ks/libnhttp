@@ -25,6 +25,13 @@ services:
     <<: *server-limits
     networks: [bench-net]
 
+  bench-node:
+    build:
+      context: .
+      dockerfile: node/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+
   bench-nhttp:
     build:
       context: ../..
@@ -39,7 +46,7 @@ services:
     cpus: "4"
     mem_limit: 1g
     networks: [bench-net]
-    depends_on: [bench-nginx, bench-apache, bench-nhttp]
+    depends_on: [bench-nginx, bench-apache, bench-node, bench-nhttp]
     profiles: ["client"]
 
   # --- scenario 3: a dynamic, per-request read-modify-write endpoint ---

@@ -14,6 +14,7 @@ WARMUP_DURATION="${WARMUP_DURATION:-5s}"
 TARGETS=(
   "nginx|http://bench-nginx:80/"
   "apache2|http://bench-apache:80/"
+  "node|http://bench-node:8080/"
   "nhttp|http://bench-nhttp:8080/"
 )
 

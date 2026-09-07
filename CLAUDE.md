@@ -858,6 +858,39 @@ zero compiler warnings, **on both platforms**, before moving on.
       `MaxRequestWorkers` — Apache silently clamps `MaxRequestWorkers` down to the default
       `ServerLimit` of 256 otherwise (logged as a startup warning, easy to miss). Fixed in
       `benchmark/docker/apache-php/mpm_prefork_bench.conf`.
+  - **Node.js added to the static-file benchmarks too, at the user's follow-up request** (both the
+    Loopback and Docker network-stack scenarios, not just scenario 3): `benchmark/docker/node/
+    static_server.js`, the same plain built-in-`http`/`fs`-only Node 20 server style as
+    `counter.js`, serving the same deterministic 10&nbsp;KB `content/index.html` nginx/Apache/
+    nhttpd already serve, via `fs.createReadStream(...).pipe(res)` per request (a real per-request
+    read, page-cache-backed after the first hit, the same cost `sendfile(2)` pays on the other
+    three — not a startup-time in-memory `Buffer` shortcut). `benchmark/docker/docker-compose.yml`
+    gained a `bench-node` service (in the *default*, unprofiled service set, alongside
+    `bench-nginx`/`bench-apache`/`bench-nhttp` — this benchmark was never scenario3-gated) and
+    `client/run.sh` gained a `node` target. For the loopback scenario, Node 20 was installed via
+    NodeSource on this machine's WSL2 Ubuntu (`apt`'s own `nodejs` there is only 18.19) and
+    `static_server.js` was run directly against the same `/tmp/bench_site` nginx/Apache's existing
+    loopback bench configs already point at (both were set up in an earlier session; still present
+    and working on this machine).
+    - **Real numbers, current `main`**: loopback — nginx 140,279 req/s, Apache 37,095 req/s,
+      Node.js **4,188 req/s**, nhttpd 61,540 req/s; Docker network-stack — nginx 59,992 req/s,
+      Apache 25,408 req/s, Node.js **3,412 req/s**, nhttpd 44,375 req/s. Node.js trails every
+      C-based server by a wide margin in both — expected, and for a different reason than
+      scenario 3's PHP comparison: a plain, unclustered `node` process is fundamentally
+      single-threaded, so it can only ever use one CPU core regardless of connection count, unlike
+      nginx's worker processes, Apache's threaded MPM, or nhttpd's own multi-worker reactor. A fair
+      Node.js number at this concurrency would need the `cluster` module or a multi-process
+      reverse-proxy in front of it — deliberately out of scope here, since the point was "how fast
+      is one plain server process," which is also the honest comparison basis for every other
+      entry in these two tables. Re-running nginx/Apache/nhttpd alongside Node.js this time (rather
+      than reusing Phase 15/16's old numbers untouched) produced slightly different req/s for all
+      three from natural run-to-run variance (e.g. loopback nginx 124,984 → 140,279) — not a
+      regression in either direction, just normal noise on this machine; `ReadMe.md`/`ReadMe.ko.md`
+      were updated with this run's full new numbers for internal consistency across the row, rather
+      than only appending Node.js's row to stale figures. The Docker-scenario's separately-recorded
+      RSS/memory-stability figures were **not** re-measured this round and are called out in
+      `ReadMe.md`/`ReadMe.ko.md` as being from the original Phase 16 three-way run specifically, so
+      they're not misread as tied to this run's request counts.
 - Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8), Phase 12's noted
   OpenSSL-on-Windows build-environment gap, and whatever `PLAN.md` currently tracks as open.
   Future work on this repo starts from here — see the module map and build instructions above,

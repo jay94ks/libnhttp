@@ -301,14 +301,16 @@ architecture overview above) — functionally equivalent, just not kernel-balanc
 
 ## Benchmarks
 
-Static-file throughput was measured against nginx 1.24 and Apache 2.4.58 (event MPM) using
-[wrk](https://github.com/wgtx/wrk), serving an identical deterministic 10&nbsp;KB HTML file, 8
-threads / 200 connections / 30s. Apache's stock `MaxRequestWorkers` (150) was raised to 800
-before measuring — the default caps concurrency well below anything a production deployment
-would run, and left unraised it produced socket errors under this load rather than a meaningful
-number. **nhttpd needs no such tuning**: every number below is the untouched library default
-(`blocking_pool_size` = 4) — see `CLAUDE.md`'s Phase 16 log for why a small pool is now *better*
-than a large one, the opposite of the advice an earlier round of this benchmark gave.
+Static-file throughput was measured against nginx 1.24, Apache 2.4.58 (event MPM), and a plain
+Node.js 20 process (`benchmark/docker/node/static_server.js`, built-in `http`/`fs` only, no
+framework or clustering) using [wrk](https://github.com/wgtx/wrk), serving an identical
+deterministic 10&nbsp;KB HTML file, 8 threads / 200 connections / 30s. Apache's stock
+`MaxRequestWorkers` (150) was raised to 800 before measuring — the default caps concurrency well
+below anything a production deployment would run, and left unraised it produced socket errors
+under this load rather than a meaningful number. **nhttpd needs no such tuning**: every number
+below is the untouched library default (`blocking_pool_size` = 4) — see `CLAUDE.md`'s Phase 16 log
+for why a small pool is now *better* than a large one, the opposite of the advice an earlier round
+of this benchmark gave.
 
 **Two real bugs in this library were found and fixed while running this benchmark** (both now
 fixed on `main`, numbers below reflect the fixed build): a systemic `task<T>` coroutine-frame leak
@@ -320,38 +322,45 @@ full root-cause story of each.
 
 | Server | Req/s | Avg latency | p50 | p99 |
 |---|---:|---:|---:|---:|
-| nginx 1.24 | 124,984 | 3.13 ms | 1.04 ms | 27.14 ms |
-| Apache 2.4.58 (event MPM, tuned) | 34,696 | 11.13 ms | 6.00 ms | 95.80 ms |
-| **nhttpd (this repo, untuned default)** | **57,964** | **4.11 ms** | **2.89 ms** | **24.45 ms** |
+| nginx 1.24 | 140,279 | 3.15 ms | 0.89 ms | 28.98 ms |
+| Apache 2.4.58 (event MPM, tuned) | 37,095 | 11.43 ms | 5.47 ms | 97.93 ms |
+| Node.js 20 (single process, no clustering) | 4,188 | 54.13 ms | 43.18 ms | 311.51 ms |
+| **nhttpd (this repo, untuned default)** | **61,540** | **4.02 ms** | **2.71 ms** | **26.35 ms** |
 
-nhttpd went from 13.8K req/s (the state this Benchmarks section originally documented) to 58K
-req/s on this exact benchmark — a ~4.2× improvement, now clearly ahead of Apache and at roughly
-half of nginx's throughput, instead of a tenth of it. This came from a `sendfile(2)` fast path for
-whole-file responses, cutting redundant thread-pool round trips, a rebuilt lock-free `thread_pool`
-job queue (three iterations — two measured as regressions and reverted before the third one
-stuck), and a windowed `mmap` read path for the requests sendfile can't take (byte-`Range`, TLS,
-chunked). `blocking_pool_size` needs no manual tuning anymore — the library's own small default is
-now the fastest setting, the opposite of what this section used to recommend. The full account,
-including what was tried and reverted along the way and why, lives in `CLAUDE.md`'s Phase 16 log;
-`PLAN.md` tracks only what's still open (a Windows equivalent of the sendfile path, and real
-`perf`-based profiling on a host that can run it).
+nhttpd went from 13.8K req/s (the state this Benchmarks section originally documented) to 61.5K
+req/s on this exact benchmark — a ~4.5× improvement, now clearly ahead of both Apache and Node.js,
+and at roughly two-fifths of nginx's throughput instead of a tenth of it. This came from a
+`sendfile(2)` fast path for whole-file responses, cutting redundant thread-pool round trips, a
+rebuilt lock-free `thread_pool` job queue (three iterations — two measured as regressions and
+reverted before the third one stuck), and a windowed `mmap` read path for the requests sendfile
+can't take (byte-`Range`, TLS, chunked). `blocking_pool_size` needs no manual tuning anymore — the
+library's own small default is now the fastest setting, the opposite of what this section used to
+recommend. Node.js trails every C-based server here by a wide margin — a plain, unclustered `node`
+process is fundamentally single-threaded, so one process can only ever use one CPU core no matter
+how many connections arrive, unlike nginx's worker processes, Apache's threaded MPM, or nhttpd's
+own multi-worker reactor; a fair Node.js comparison at this concurrency would need the `cluster`
+module or a multi-process reverse-proxy setup, deliberately out of scope for "how fast is one
+plain server process." The full account, including what was tried and reverted along the way and
+why, lives in `CLAUDE.md`'s Phase 16 log; `PLAN.md` tracks only what's still open (a Windows
+equivalent of the sendfile path, and revisiting a couple of specific questions with real
+`perf`-based profiling now that a host to run it on exists).
 
 ### Docker network-stack benchmark
 
 A same-host, same-kernel loopback benchmark understates real-world overhead: Linux's loopback
 interface skips large parts of the normal socket-to-NIC path (no real Ethernet framing, no
-driver queueing, and often no checksum work). `benchmark/docker/` runs the same three servers as
-separate containers on one Docker bridge network, driven by a fourth client container issuing
+driver queueing, and often no checksum work). `benchmark/docker/` runs the same four servers as
+separate containers on one Docker bridge network, driven by a fifth client container issuing
 `wrk` against each server by its container DNS name — every request crosses a real veth pair and
-Linux bridge, the same kernel code paths a real NIC deployment exercises. All three server
-containers get identical `cpus`/`mem_limit` resource caps so none has an unfair advantage.
+Linux bridge, the same kernel code paths a real NIC deployment exercises. All server containers
+get identical `cpus`/`mem_limit` resource caps so none has an unfair advantage.
 
 Reproduce it:
 
 ```bash
 cd benchmark/docker
 docker compose build
-docker compose up -d bench-nginx bench-apache bench-nhttp
+docker compose up -d bench-nginx bench-apache bench-node bench-nhttp
 docker compose run --rm bench-client
 ```
 
@@ -360,18 +369,22 @@ run above), current `main`, nhttpd still at its untuned default:
 
 | Server | Req/s | Avg latency | p50 | p99 |
 |---|---:|---:|---:|---:|
-| nginx 1.24 | 55,171 | 5.31 ms | 2.71 ms | 34.20 ms |
-| Apache 2.4.58 (event MPM, tuned) | 21,558 | 19.36 ms | 9.65 ms | 135.37 ms |
-| **nhttpd (this repo, untuned default)** | **35,869** | **6.53 ms** | **4.62 ms** | **34.00 ms** |
+| nginx 1.24 | 59,992 | 5.17 ms | 2.41 ms | 35.12 ms |
+| Apache 2.4.58 (event MPM, tuned) | 25,408 | 17.99 ms | 8.19 ms | 144.63 ms |
+| Node.js 20 (single process, no clustering) | 3,412 | 66.71 ms | 53.40 ms | 435.54 ms |
+| **nhttpd (this repo, untuned default)** | **44,375** | **5.33 ms** | **3.77 ms** | **29.50 ms** |
 
-Same story as the loopback numbers: nhttpd (11,170 → 35,869 req/s, a ~3.2× improvement) clearly
-beats Apache here too, and sits at roughly two-thirds of nginx's throughput instead of a sixth.
-All three containers stayed up and memory-stable for the full run — nhttpd used only
-**4.96&nbsp;MiB RSS across 13 threads** after 1.08M requests, both figures lower than nginx's own
-(9 processes/threads, 16.96&nbsp;MiB) and far lower than Apache's (199 processes, 26.93&nbsp;MiB) —
-confirming the coroutine-leak fix holds under real containerized network traffic, not just
-loopback, and that the small default thread/worker counts P1–P4 arrived at are a genuine resource
-efficiency, not just a throughput number.
+Same story as the loopback numbers: nhttpd (11,170 → 44,375 req/s, a ~4.0× improvement) clearly
+beats Apache and Node.js here too, and sits at roughly three-quarters of nginx's throughput instead
+of a sixth. Node.js falls even further behind under the extra latency of real network-stack
+traffic, for the same single-core reason noted in the loopback section above. All server
+containers stayed up and memory-stable for the full run. A separate memory-stability check from
+the original three-way run (Phase 16, before Node.js was added to this comparison) found nhttpd
+using only **4.96&nbsp;MiB RSS across 13 threads** after 1.08M requests, both figures lower than
+nginx's own (9 processes/threads, 16.96&nbsp;MiB) and far lower than Apache's (199 processes,
+26.93&nbsp;MiB) — confirming the coroutine-leak fix holds under real containerized network
+traffic, not just loopback, and that the small default thread/worker counts P1–P4 arrived at are
+a genuine resource efficiency, not just a throughput number.
 
 ### Scenario 3: a dynamic, per-request read-modify-write endpoint (PHP and Node.js comparison)
 

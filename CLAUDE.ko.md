@@ -852,6 +852,38 @@ ctest --test-dir build-win --output-on-failure
       Apache가 `MaxRequestWorkers`를 기본 `ServerLimit`인 256으로 조용히 깎아버립니다(시작
       시 경고로만 로그에 남아서 놓치기 쉽습니다). `benchmark/docker/apache-php/
       mpm_prefork_bench.conf`에서 고쳤습니다.
+  - **사용자의 후속 요청으로 정적 파일 벤치마크(시나리오 3뿐 아니라 루프백과 Docker 네트워크
+    스택 시나리오 모두)에도 Node.js를 추가**: `benchmark/docker/node/static_server.js`는
+    `counter.js`와 같은 방식(내장 `http`/`fs`만 쓰는 순수 Node 20 서버)으로, nginx/Apache/
+    nhttpd가 이미 서빙하는 그 결정적 10&nbsp;KB `content/index.html`을 요청마다
+    `fs.createReadStream(...).pipe(res)`로 서빙합니다(첫 히트 이후엔 페이지 캐시로 뒷받침되는
+    진짜 요청별 읽기라는 점에서, 다른 셋이 `sendfile(2)`로 치르는 것과 같은 비용입니다 —
+    시작 시점에 메모리에 올려두는 지름길이 아닙니다). `benchmark/docker/docker-compose.yml`에
+    `bench-node` 서비스가 추가됐는데(`bench-nginx`/`bench-apache`/`bench-nhttp`와 나란히
+    *기본*, 프로파일 없는 서비스 세트에 — 이 벤치마크는 애초에 scenario3로 묶여 있던 적이
+    없습니다), `client/run.sh`에도 `node` 타겟이 추가됐습니다. 루프백 시나리오를 위해 이
+    머신의 WSL2 Ubuntu에 NodeSource로 Node 20을 설치했고(`apt` 자체의 `nodejs`는 18.19뿐),
+    `static_server.js`를 nginx/Apache의 기존 루프백 벤치 설정이 이미 가리키고 있는 그
+    `/tmp/bench_site`에 대고 직접 실행했습니다(둘 다 이전 세션에서 이미 세팅해둔 것이 이
+    머신에 그대로 남아 여전히 동작했습니다).
+    - **실제 수치, 현재 `main`**: 루프백 — nginx 140,279 req/s, Apache 37,095 req/s, Node.js
+      **4,188 req/s**, nhttpd 61,540 req/s; Docker 네트워크 스택 — nginx 59,992 req/s, Apache
+      25,408 req/s, Node.js **3,412 req/s**, nhttpd 44,375 req/s. Node.js는 둘 다에서 C 기반
+      서버 전부에 크게 뒤처지는데 — 예상된 결과이고, 시나리오 3의 PHP 비교와는 다른 이유
+      때문입니다: 클러스터링 없는 순수 `node` 프로세스는 근본적으로 단일 스레드라서, 커넥션
+      수와 무관하게 CPU 코어 하나만 쓸 수 있습니다. nginx의 워커 프로세스들, Apache의 스레드
+      MPM, nhttpd 자신의 멀티 워커 리액터와는 다릅니다. 이 동시성 수준에서 공평한 Node.js
+      수치를 얻으려면 `cluster` 모듈이나 그 앞의 멀티 프로세스 리버스 프록시가 필요한데,
+      일부러 범위 밖으로 뒀습니다 — 요지가 "순정 서버 프로세스 하나가 얼마나 빠른가"였고,
+      이 두 표의 다른 모든 항목도 같은 정직한 비교 기준을 쓰고 있으니까요. 이번에 Node.js와
+      나란히 nginx/Apache/nhttpd를 다시 돌린 것(Phase 15/16의 예전 수치를 그대로 재사용하지
+      않고)은 세 서버 모두에서 자연스러운 실행 간 편차로 약간 다른 req/s를 냈습니다(예:
+      루프백 nginx 124,984 → 140,279) — 어느 방향으로든 퇴보가 아니라 이 머신에서의 정상적인
+      노이즈일 뿐입니다; `ReadMe.md`/`ReadMe.ko.md`는 Node.js 행만 낡은 수치에 덧붙이는 대신,
+      한 행 안에서 내부적으로 일관되도록 이번 실행의 새 수치 전체로 갱신했습니다. Docker
+      시나리오에서 따로 기록해둔 RSS/메모리 안정성 수치는 이번 라운드에 **다시 측정하지
+      않았고**, 이번 실행의 요청 수와 엮인 것으로 잘못 읽히지 않도록 원래 Phase 16의 3자
+      비교 실행에서 나온 것이라고 `ReadMe.md`/`ReadMe.ko.md`에 명시해뒀습니다.
 - 계획에 남은 것은 QUIC/HTTP-3(보류, 결정 #8 참고), Phase 12가 기록한 Windows에서의 OpenSSL
   빌드 환경 공백, 그리고 PLAN.md가 현재 추적하는 것들뿐입니다. 이 저장소의 향후 작업은
   여기서부터 시작합니다 — 위의 모듈 맵과 빌드 안내, 사용자 대상 API 투어는 `ReadMe.md`,
