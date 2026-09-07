@@ -806,29 +806,41 @@ ctest --test-dir build-win --output-on-failure
     - 이 변경 후 두 플랫폼 **모두**에서 전체 스위트가 경고 없이 통과함을 확인했습니다: 리눅스/
       WSL 119/119, 네이티브 Windows/MSVC 115/115(테스트 개수가 Phase 16의 113/113과 다른 건
       그사이 스위트가 늘어서일 뿐, 퇴보가 아닙니다).
-  - **사용자의 요청으로 추가한 새 벤치마크 시나리오, PHP와 비교한 진짜 동적 엔드포인트(정적
-    파일이 아닌)**: `benchmark/docker/nhttp/bench_counter_main.cpp`(파일에서 정수를 읽어서
-    증가시키고 다시 쓴 뒤 새 값을 응답하는 엔드포인트 — `thread_pool`로 오프로드되고, 서버
-    전체가 프로세스 하나이므로 그냥 `std::mutex`로 직렬화)를 `benchmark/docker/php/
-    counter.php`(동등한 스크립트, `flock()`으로 직렬화)와 **nginx 1.27-alpine + PHP-FPM
-    8.3**(`benchmark/docker/nginx-php/`) 및 **`php:8.3-apache`(mpm_prefork + mod_php)**
-    (`benchmark/docker/apache-php/`) 위에서 비교했습니다 — mod_php는 스레드 안전하지 않은
-    MPM을 요구하므로, 정적 파일 벤치마크의 순정 Apache가 쓰는 event MPM이 아니라 prefork가
-    여기서는 벤치마크만을 위한 타협이 아니라 정확하고 표준적인 실제 선택입니다. 새
-    `docker-compose.yml` 서비스들(`bench-nginx-php`, `bench-apache-php`,
-    `bench-nhttp-counter`, `bench-client-scenario3`)은 `scenario3` compose 프로파일 뒤에
-    묶여 있는데, 이 벤치마크는 오직 Docker 안에서만 구동해야 한다는 사용자의 명시적 지시에
-    따른 것입니다 — 다른 두 벤치마크와 달리 루프백 버전은 없습니다.
+  - **사용자의 요청으로 추가한 새 벤치마크 시나리오, PHP 및 (같은 날 후속 요청으로 추가한)
+    Node.js와 비교한 진짜 동적 엔드포인트(정적 파일이 아닌)**: `benchmark/docker/nhttp/
+    bench_counter_main.cpp`(파일에서 정수를 읽어서 증가시키고 다시 쓴 뒤 새 값을 응답하는
+    엔드포인트 — `thread_pool`로 오프로드되고, 서버 전체가 프로세스 하나이므로 그냥
+    `std::mutex`로 직렬화)를 `benchmark/docker/php/counter.php`(동등한 스크립트, `flock()`으로
+    직렬화)와 **nginx 1.27-alpine + PHP-FPM 8.3**(`benchmark/docker/nginx-php/`) 및
+    **`php:8.3-apache`(mpm_prefork + mod_php)**(`benchmark/docker/apache-php/`) 위에서
+    비교했습니다 — mod_php는 스레드 안전하지 않은 MPM을 요구하므로, 정적 파일 벤치마크의 순정
+    Apache가 쓰는 event MPM이 아니라 prefork가 여기서는 벤치마크만을 위한 타협이 아니라 정확하고
+    표준적인 실제 선택입니다 — 그리고 `benchmark/docker/node-counter/counter.js`, 클러스터링
+    없는 순수 Node.js 20 프로세스(내장 `http`/`fs`만 사용) 하나도 같은 읽기-증가-쓰기를 *동기*
+    `fs.readFileSync`/`writeFileSync` 호출로 하는데, 일부러 이렇게 한 이유는 하나뿐인 이벤트
+    루프 스레드가 파일 I/O 동안 블로킹되게 해서 다른 세 쪽의 mutex/`flock()`과 똑같은 방식으로
+    임계 구역을 직렬화하기 위해서입니다 — 비동기 `fs.promises` API를 썼다면 동시 요청 두 개가
+    각자의 읽기와 쓰기 사이에 끼어들어 갱신을 조용히 잃어버렸을 텐데, 이게 바로 다른 세 쪽이
+    전부 막으려고 비용을 치르는 그 경합입니다. 새 `docker-compose.yml` 서비스들
+    (`bench-nginx-php`, `bench-apache-php`, `bench-nhttp-counter`, `bench-node-counter`,
+    `bench-client-scenario3`)은 `scenario3` compose 프로파일 뒤에 묶여 있는데, 이 벤치마크는
+    오직 Docker 안에서만 구동해야 한다는 사용자의 명시적 지시에 따른 것입니다 — 다른 두
+    벤치마크와 달리 루프백 버전은 없습니다.
     - **실제 수치, 현재 `main`** (컨테이너당 4 CPU/1&nbsp;GiB, 8스레드/200커넥션/30초,
-      다른 Docker 벤치마크와 동일한 자원 제한): nhttpd **53,619 req/s** 대 nginx+PHP-FPM의
-      **3,085 req/s**, Apache+mod_php의 **3,474 req/s** — 대략 **15~17배** 더 빠른데, 정적
-      파일 시나리오들보다 훨씬 큰 차이이고 당연한 결과이기도 합니다: 이건 사실상 nginx/Apache
-      자체의 요청 처리 품질이 아니라, 요청마다 인터프리터 스크립팅 레이어로 진입하는 비용
-      (FastCGI 왕복 또는 프로세스 내 PHP 인터프리터 호출)과 이미 그 커넥션을 소유한 프로세스
-      안에서 그냥 도는 컴파일된 C++ 핸들러를 비교하는 것입니다. 세 카운터 모두 각 실행 후
-      값을 읽어서 예상 요청 수와 교차 검증해 동시성 아래 갱신 유실이 없었음을(양쪽의 락이
-      제대로 버텼음을) 확인했습니다. 전체 결과와 재현 방법은 `ReadMe.md`의 벤치마크 섹션에
-      있습니다.
+      다른 Docker 벤치마크와 동일한 자원 제한): nhttpd **57,351 req/s** 대 nginx+PHP-FPM의
+      **3,182 req/s**, Apache+mod_php의 **3,269 req/s**, Node.js의 **4,539 req/s** — 셋 중
+      어느 것보다도 대략 **12~18배** 더 빠른데, 정적 파일 시나리오들보다 훨씬 큰 차이이고
+      당연한 결과이기도 합니다: 이건 사실상 nginx/Apache/Node 자체의 일반적인 요청 처리
+      품질이 아니라, 요청마다 인터프리터 혹은 단일 스레드 스크립팅 레이어로 진입하는 비용
+      (FastCGI 왕복, 프로세스 내 PHP 인터프리터 호출, 또는 Node가 동기 파일 I/O에서 하나뿐인
+      이벤트 루프 스레드를 블로킹하는 것)과 이미 그 커넥션을 소유한 프로세스 안에서 실제
+      스레드 풀로 오프로드되어 그냥 도는 컴파일된 C++ 핸들러를 비교하는 것입니다. 셋 중에서는
+      Node가 가장 근접했지만(PHP처럼 요청마다 프로세스/인터프리터를 새로 띄우는 오버헤드가
+      없으니까요), nhttp의 멀티 워커 리액터와 달리 여전히 스레드 하나 뒤에 완전히
+      직렬화되어 있습니다. 네 카운터 모두 각 실행 후 값을 읽어서 예상 요청 수와 교차 검증해
+      동시성 아래 갱신 유실이 없었음을(Node을 포함해 모든 쪽의 직렬화가 제대로 버텼음을 —
+      위의 동기 fs 설계 선택을 일부러 했기 때문에) 확인했습니다. 전체 결과와 재현 방법은
+      `ReadMe.md`의 벤치마크 섹션에 있습니다.
     - **이걸 만들다 부딪힌 패키징 함정**: `nginx:1.24-alpine`(Alpine 3.17)에는 `php83`/
       `php83-fpm` 패키지가 없습니다 — Alpine은 버전이 붙은 PHP 패키지만 배포하는데, 3.17의
       저장소는 `php81`까지밖에 없습니다. 두 PHP 타겟이 조용히 PHP 8.1 대 8.3을 비교하게

@@ -373,7 +373,7 @@ confirming the coroutine-leak fix holds under real containerized network traffic
 loopback, and that the small default thread/worker counts P1–P4 arrived at are a genuine resource
 efficiency, not just a throughput number.
 
-### Scenario 3: a dynamic, per-request read-modify-write endpoint (PHP comparison)
+### Scenario 3: a dynamic, per-request read-modify-write endpoint (PHP and Node.js comparison)
 
 Both benchmarks above serve a static file — a case nhttpd optimized heavily for (the `sendfile(2)`
 fast path). This scenario compares a genuinely dynamic endpoint instead: one that reads an integer
@@ -381,17 +381,22 @@ out of a file, increments it, writes it back, and responds with the new value, o
 request. nhttpd's own handler (`benchmark/docker/nhttp/bench_counter_main.cpp`) does this in
 native C++ (offloaded to `thread_pool`, guarded by a `std::mutex`); nginx+PHP-FPM and
 Apache+mod_php run an equivalent script (`benchmark/docker/php/counter.php`, PHP 8.3, guarded by
-`flock()`) doing the same read-increment-write against the same kind of file. This is deliberately
-**Docker-only** (`benchmark/docker/`, `--profile scenario3`) — there's no loopback variant, since
-the point is a fair, apples-to-apples comparison of three real server stacks under the same
-containerized network path used above, not a raw-syscall microbenchmark.
+`flock()`); a plain, unclustered Node.js 20 process (`benchmark/docker/node-counter/counter.js`,
+built-in `http`/`fs` only, no framework or dependencies) does the same with synchronous
+`fs.readFileSync`/`writeFileSync` calls, which block its one event-loop thread for the duration of
+the file I/O and so serialize the critical section the same way the mutex/`flock()` do on the
+other two — all four are paying for the same correctness-under-concurrency guarantee, just via
+different mechanisms. This is deliberately **Docker-only** (`benchmark/docker/`,
+`--profile scenario3`) — there's no loopback variant, since the point is a fair, apples-to-apples
+comparison of real server stacks under the same containerized network path used above, not a
+raw-syscall microbenchmark.
 
 Reproduce it:
 
 ```bash
 cd benchmark/docker
-docker compose build bench-nginx-php bench-apache-php bench-nhttp-counter
-docker compose --profile scenario3 up -d bench-nginx-php bench-apache-php bench-nhttp-counter
+docker compose build bench-nginx-php bench-apache-php bench-node-counter bench-nhttp-counter
+docker compose --profile scenario3 up -d bench-nginx-php bench-apache-php bench-node-counter bench-nhttp-counter
 docker compose run --rm bench-client-scenario3
 ```
 
@@ -400,18 +405,22 @@ scenarios above):
 
 | Server | Req/s | Avg latency | p50 | p99 |
 |---|---:|---:|---:|---:|
-| nginx 1.24 + PHP-FPM 8.3 | 3,085 | 86.50 ms | 58.81 ms | 475.23 ms |
-| Apache 2.4 (mpm_prefork) + mod_php 8.3 | 3,474 | 79.82 ms | 46.60 ms | 527.78 ms |
-| **nhttpd (this repo, untuned default)** | **53,619** | **4.59 ms** | **3.05 ms** | **28.97 ms** |
+| nginx 1.24 + PHP-FPM 8.3 | 3,182 | 81.76 ms | 56.98 ms | 436.19 ms |
+| Apache 2.4 (mpm_prefork) + mod_php 8.3 | 3,269 | 80.11 ms | 50.72 ms | 479.02 ms |
+| Node.js 20 (single process, no clustering) | 4,539 | 50.59 ms | 40.13 ms | 294.37 ms |
+| **nhttpd (this repo, untuned default)** | **57,351** | **4.25 ms** | **2.87 ms** | **25.92 ms** |
 
-nhttpd is **~15–17× faster** here than either PHP stack — a much larger gap than the static-file
-scenarios, and an expected one: this isn't measuring nginx/Apache's own request handling so much as
-the cost of dispatching into an interpreted scripting layer on every request (PHP-FPM's FastCGI
-round-trip, or mod_php's in-process interpreter invocation) versus nhttpd's handler running as
-plain compiled C++ in the same process that already owns the connection. Apache logged 91 socket
-timeouts out of ~104.7K requests (0.09%) under this load; nginx+PHP-FPM had none. All three
-counters were cross-checked after each run to confirm no lost updates under concurrency (the
-`std::mutex`/`flock()` serialization on each side held).
+nhttpd is **~12–18× faster** here than any of the other three — a much larger gap than the
+static-file scenarios, and an expected one: this isn't measuring nginx/Apache/Node's own general
+request-handling quality so much as the cost of dispatching into an interpreted/single-threaded
+scripting layer on every request (PHP-FPM's FastCGI round-trip, mod_php's in-process interpreter
+invocation, or Node's single event-loop thread blocking on synchronous file I/O) versus nhttpd's
+handler running as plain compiled C++, offloaded to a real thread pool, in the same process that
+already owns the connection. Node comes closest of the three (no per-request process/interpreter
+dispatch overhead the way PHP has), but is still fully serialized behind one thread, unlike
+nhttp's multi-worker reactor. Apache logged 85 socket timeouts and Node 62, both out of roughly
+100–140K requests (under 0.1%); nginx+PHP-FPM had none. All four counters were cross-checked after
+each run to confirm no lost updates under concurrency (every side's serialization mechanism held).
 
 ## Design documents
 

@@ -376,7 +376,7 @@ Apache를 확실히 앞서고, nginx의 6분의 1이 아니라 대략 3분의 2 
 유효함을, 그리고 P1~P4가 도달한 작은 기본 스레드/워커 수가 단순한 처리량 숫자가 아니라
 실제 자원 효율임을 확인했습니다.
 
-### 시나리오 3: 요청마다 읽고-바꾸고-쓰는 동적 엔드포인트 (PHP 비교)
+### 시나리오 3: 요청마다 읽고-바꾸고-쓰는 동적 엔드포인트 (PHP, Node.js 비교)
 
 위 두 벤치마크는 전부 정적 파일 서빙입니다 — nhttpd가 (`sendfile(2)` 고속 경로로) 집중적으로
 최적화해둔 케이스죠. 이 시나리오는 진짜 동적인 엔드포인트를 비교합니다: 요청마다 파일에서
@@ -384,17 +384,22 @@ Apache를 확실히 앞서고, nginx의 6분의 1이 아니라 대략 3분의 2 
 핸들러(`benchmark/docker/nhttp/bench_counter_main.cpp`)는 이걸 네이티브 C++로 처리하고
 (`thread_pool`로 오프로드, `std::mutex`로 보호), nginx+PHP-FPM과 Apache+mod_php는 같은 종류의
 파일에 대해 같은 읽기-증가-쓰기를 하는 동등한 스크립트(`benchmark/docker/php/counter.php`,
-PHP 8.3, `flock()`으로 보호)를 실행합니다. 이 벤치마크는 일부러 **Docker 전용**으로만
+PHP 8.3, `flock()`으로 보호)를 실행합니다. 클러스터링 없는 순수 Node.js 20 프로세스 하나
+(`benchmark/docker/node-counter/counter.js`, 프레임워크나 의존성 없이 내장 `http`/`fs`만 사용)는
+동기 `fs.readFileSync`/`writeFileSync` 호출로 같은 일을 하는데, 이 호출들이 파일 I/O가 끝날
+때까지 Node의 하나뿐인 이벤트 루프 스레드를 블로킹하기 때문에 다른 둘의 mutex/`flock()`과
+똑같은 방식으로 임계 구역을 직렬화합니다 — 네 쪽 모두 메커니즘만 다를 뿐 동시성 아래서의
+정확성이라는 같은 것을 위해 비용을 치르는 셈입니다. 이 벤치마크는 일부러 **Docker 전용**으로만
 구동됩니다(`benchmark/docker/`, `--profile scenario3`) — 루프백 버전은 없습니다: 목적이 순수
-시스템 콜 마이크로벤치마크가 아니라, 위 시나리오들과 같은 컨테이너 네트워크 경로 위에서 세
-서버 스택을 공평하게 비교하는 것이기 때문입니다.
+시스템 콜 마이크로벤치마크가 아니라, 위 시나리오들과 같은 컨테이너 네트워크 경로 위에서 실제
+서버 스택들을 공평하게 비교하는 것이기 때문입니다.
 
 재현 방법:
 
 ```bash
 cd benchmark/docker
-docker compose build bench-nginx-php bench-apache-php bench-nhttp-counter
-docker compose --profile scenario3 up -d bench-nginx-php bench-apache-php bench-nhttp-counter
+docker compose build bench-nginx-php bench-apache-php bench-node-counter bench-nhttp-counter
+docker compose --profile scenario3 up -d bench-nginx-php bench-apache-php bench-node-counter bench-nhttp-counter
 docker compose run --rm bench-client-scenario3
 ```
 
@@ -402,18 +407,23 @@ docker compose run --rm bench-client-scenario3
 
 | 서버 | Req/s | 평균 지연시간 | p50 | p99 |
 |---|---:|---:|---:|---:|
-| nginx 1.24 + PHP-FPM 8.3 | 3,085 | 86.50 ms | 58.81 ms | 475.23 ms |
-| Apache 2.4 (mpm_prefork) + mod_php 8.3 | 3,474 | 79.82 ms | 46.60 ms | 527.78 ms |
-| **nhttpd (이 저장소, 튜닝 없음/기본값)** | **53,619** | **4.59 ms** | **3.05 ms** | **28.97 ms** |
+| nginx 1.24 + PHP-FPM 8.3 | 3,182 | 81.76 ms | 56.98 ms | 436.19 ms |
+| Apache 2.4 (mpm_prefork) + mod_php 8.3 | 3,269 | 80.11 ms | 50.72 ms | 479.02 ms |
+| Node.js 20 (단일 프로세스, 클러스터링 없음) | 4,539 | 50.59 ms | 40.13 ms | 294.37 ms |
+| **nhttpd (이 저장소, 튜닝 없음/기본값)** | **57,351** | **4.25 ms** | **2.87 ms** | **25.92 ms** |
 
-nhttpd가 여기서는 **약 15~17배** 더 빠릅니다 — 정적 파일 시나리오들보다 훨씬 큰 차이인데,
-당연한 결과이기도 합니다: 이건 사실 nginx/Apache 자체의 요청 처리 능력을 재는 게 아니라,
-요청마다 인터프리터 스크립팅 레이어로 진입하는 비용(PHP-FPM의 FastCGI 왕복, 또는 mod_php의
-프로세스 내 인터프리터 호출)과, 이미 그 커넥션을 소유하고 있는 프로세스 안에서 그냥 컴파일된
-C++로 도는 nhttpd 핸들러를 비교하는 것에 가깝습니다. 이 부하에서 Apache는 약 104.7천 요청 중
-91건(0.09%)의 소켓 타임아웃을 기록했고, nginx+PHP-FPM은 하나도 없었습니다. 세 카운터 모두 각
-실행 후 값을 확인해서 동시성 아래서도 갱신 유실이 없었음을(양쪽의 `std::mutex`/`flock()`
-직렬화가 제대로 버텼음을) 교차 검증했습니다.
+nhttpd가 여기서는 나머지 셋 중 어느 것보다도 **약 12~18배** 더 빠릅니다 — 정적 파일
+시나리오들보다 훨씬 큰 차이인데, 당연한 결과이기도 합니다: 이건 사실 nginx/Apache/Node
+자체의 일반적인 요청 처리 품질을 재는 게 아니라, 요청마다 인터프리터/단일 스레드 스크립팅
+레이어로 진입하는 비용(PHP-FPM의 FastCGI 왕복, mod_php의 프로세스 내 인터프리터 호출, 또는
+Node가 동기 파일 I/O에서 하나뿐인 이벤트 루프 스레드를 블로킹하는 것)과, 이미 그 커넥션을
+소유하고 있는 프로세스 안에서 실제 스레드 풀로 오프로드되어 그냥 컴파일된 C++로 도는
+nhttpd 핸들러를 비교하는 것에 가깝습니다. 셋 중에서는 Node가 가장 근접했습니다(PHP처럼
+요청마다 프로세스/인터프리터를 새로 띄우는 오버헤드가 없으니까요), 하지만 nhttp의 멀티
+워커 리액터와 달리 여전히 스레드 하나 뒤에 완전히 직렬화되어 있습니다. 이 부하에서 Apache는
+약 10만~14만 요청 중 85건, Node는 62건의 소켓 타임아웃을 기록했고(둘 다 0.1% 미만),
+nginx+PHP-FPM은 하나도 없었습니다. 네 카운터 모두 각 실행 후 값을 확인해서 동시성 아래서도
+갱신 유실이 없었음을(모든 쪽의 직렬화 메커니즘이 제대로 버텼음을) 교차 검증했습니다.
 
 ## 설계 문서
 

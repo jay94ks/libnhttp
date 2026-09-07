@@ -813,28 +813,41 @@ zero compiler warnings, **on both platforms**, before moving on.
       Linux/WSL, 115/115 on native Windows/MSVC (test counts differ from Phase 16's 113/113 simply
       because the suite has grown since; not a regression).
   - **A new benchmark scenario, added at the user's request, comparing a genuinely dynamic
-    endpoint (not a static file) against PHP**: `benchmark/docker/nhttp/bench_counter_main.cpp`
-    (an endpoint that reads an integer out of a file, increments it, writes it back, and responds
-    with the new value — offloaded to `thread_pool`, serialized by a plain `std::mutex` since the
-    whole server is one process) versus `benchmark/docker/php/counter.php` (an equivalent script,
-    serialized by `flock()`) run under **nginx 1.27-alpine + PHP-FPM 8.3** (`benchmark/docker/
-    nginx-php/`) and **`php:8.3-apache` (mpm_prefork + mod_php)** (`benchmark/docker/apache-php/`)
-    — mod_php requires a non-threaded MPM, so prefork (not the event MPM the static-file
-    benchmark's plain Apache uses) is the correct, standard real-world choice here, not a
-    benchmark-only compromise. New `docker-compose.yml` services (`bench-nginx-php`,
-    `bench-apache-php`, `bench-nhttp-counter`, `bench-client-scenario3`) gated behind a
-    `scenario3` compose profile, per the user's explicit instruction that this benchmark only
-    ever runs inside Docker — no loopback variant exists for it, unlike the other two benchmarks.
+    endpoint (not a static file) against PHP and (added in a same-day follow-up) Node.js**:
+    `benchmark/docker/nhttp/bench_counter_main.cpp` (an endpoint that reads an integer out of a
+    file, increments it, writes it back, and responds with the new value — offloaded to
+    `thread_pool`, serialized by a plain `std::mutex` since the whole server is one process)
+    versus `benchmark/docker/php/counter.php` (an equivalent script, serialized by `flock()`) run
+    under **nginx 1.27-alpine + PHP-FPM 8.3** (`benchmark/docker/nginx-php/`) and
+    **`php:8.3-apache` (mpm_prefork + mod_php)** (`benchmark/docker/apache-php/`) — mod_php
+    requires a non-threaded MPM, so prefork (not the event MPM the static-file benchmark's plain
+    Apache uses) is the correct, standard real-world choice here, not a benchmark-only compromise
+    — plus `benchmark/docker/node-counter/counter.js`, a plain unclustered Node.js 20 process
+    (built-in `http`/`fs` only) doing the same read-increment-write with *synchronous*
+    `fs.readFileSync`/`writeFileSync` calls specifically so the single event-loop thread blocks
+    for the file I/O and serializes the critical section the same way the other three sides'
+    mutex/`flock()` do — the async `fs.promises` API would have let two concurrent requests
+    interleave between their read and their write and silently lose updates, the exact race the
+    other three sides all pay to prevent. New `docker-compose.yml` services (`bench-nginx-php`,
+    `bench-apache-php`, `bench-nhttp-counter`, `bench-node-counter`, `bench-client-scenario3`)
+    gated behind a `scenario3` compose profile, per the user's explicit instruction that this
+    benchmark only ever runs inside Docker — no loopback variant exists for it, unlike the other
+    two benchmarks.
     - **Real numbers, current `main`** (4 CPUs/1&nbsp;GiB per container, 8t/200c/30s, same
-      resource limits as the other Docker benchmark): nhttpd **53,619 req/s** vs. nginx+PHP-FPM's
-      **3,085 req/s** and Apache+mod_php's **3,474 req/s** — roughly **15-17× faster**, a much
-      larger gap than the static-file scenarios, and an expected one: this mostly measures the
-      cost of dispatching into an interpreted scripting layer per request (FastCGI round-trip or
-      an in-process PHP interpreter invocation) against a compiled C++ handler in the same
-      process that already owns the connection, not nginx/Apache's own request-handling quality.
-      All three counters were read back after each run and cross-checked against expected request
-      counts to confirm no lost updates under concurrency (both sides' locking held). Full results
-      and reproduction steps are in `ReadMe.md`'s Benchmarks section.
+      resource limits as the other Docker benchmark): nhttpd **57,351 req/s** vs. nginx+PHP-FPM's
+      **3,182 req/s**, Apache+mod_php's **3,269 req/s**, and Node.js's **4,539 req/s** — roughly
+      **12-18× faster** than any of the three, a much larger gap than the static-file scenarios,
+      and an expected one: this mostly measures the cost of dispatching into an interpreted or
+      single-threaded scripting layer per request (FastCGI round-trip, an in-process PHP
+      interpreter invocation, or Node's one event-loop thread blocking on synchronous file I/O)
+      against a compiled C++ handler — offloaded to a real thread pool — in the same process that
+      already owns the connection, not nginx/Apache/Node's own general request-handling quality.
+      Node came closest of the three (no per-request process/interpreter dispatch overhead the way
+      PHP has) but is still fully serialized behind a single thread, unlike nhttp's multi-worker
+      reactor. All four counters were read back after each run and cross-checked against expected
+      request counts to confirm no lost updates under concurrency (every side's serialization held
+      — Node included, once the synchronous-fs design choice above was made deliberately). Full
+      results and reproduction steps are in `ReadMe.md`'s Benchmarks section.
     - **A packaging gotcha hit while building this**: `nginx:1.24-alpine` (Alpine 3.17) has no
       `php83`/`php83-fpm` package — Alpine only ships versioned PHP packages, and 3.17's repos top
       out at `php81`. Switched to `nginx:1.27-alpine` (a newer Alpine base) specifically so both

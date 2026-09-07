@@ -71,6 +71,14 @@ services:
     networks: [bench-net]
     profiles: ["scenario3"]
 
+  bench-node-counter:
+    build:
+      context: .
+      dockerfile: node-counter/Dockerfile
+    <<: *server-limits
+    networks: [bench-net]
+    profiles: ["scenario3"]
+
   bench-client-scenario3:
     build:
       context: .
@@ -78,7 +86,7 @@ services:
     cpus: "4"
     mem_limit: 1g
     networks: [bench-net]
-    depends_on: [bench-nginx-php, bench-apache-php, bench-nhttp-counter]
+    depends_on: [bench-nginx-php, bench-apache-php, bench-nhttp-counter, bench-node-counter]
     profiles: ["scenario3"]
     entrypoint: ["bash", "/scenario3.sh"]
     volumes:

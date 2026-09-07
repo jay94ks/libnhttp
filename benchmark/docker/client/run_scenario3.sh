@@ -15,6 +15,7 @@ WARMUP_DURATION="${WARMUP_DURATION:-5s}"
 TARGETS=(
   "nginx+php-fpm|http://bench-nginx-php:80/counter.php"
   "apache+mod_php|http://bench-apache-php:80/counter.php"
+  "node|http://bench-node-counter:8080/"
   "nhttp|http://bench-nhttp-counter:8080/"
 )
 
