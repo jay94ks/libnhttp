@@ -26,6 +26,7 @@
 * [가상 호스팅](#가상-호스팅)
 * [라우팅 (`router` 모듈)](#라우팅-router-모듈)
 * [WebSocket](#websocket)
+* [TLS/SSL](#tlsssl)
 * [설계 문서](#설계-문서)
 
 ## 라이선스
@@ -63,6 +64,7 @@ SOFTWARE.
 * Linux (epoll 기반 리액터; 이번 라운드에서는 Windows 미지원)
 * GCC ≥ 11 또는 Clang ≥ 14 (C++20 코루틴)
 * CMake ≥ 3.20
+* OpenSSL (TLS/SSL 지원용; 비활성화하려면 아래 `NHTTP_ENABLE_TLS` 참고)
 
 ## 빌드
 
@@ -79,6 +81,7 @@ ctest --test-dir build --output-on-failure
 | `NHTTP_BUILD_TESTS` | `ON` | Catch2 테스트 스위트를 빌드 |
 | `NHTTP_BUILD_EXAMPLES` | `ON` | `examples/nhttpd`를 빌드 |
 | `NHTTP_WARNINGS_AS_ERRORS` | `ON` | 컴파일러 경고를 에러로 처리 |
+| `NHTTP_ENABLE_TLS` | `ON` | TLS/SSL 지원을 빌드 (OpenSSL 필요) |
 
 이 라이브러리는 `-Wall -Wextra -Wpedantic`(그리고 그 외 몇 가지, `cmake/CompilerWarnings.cmake`
 참고) 기준으로 경고 없이 빌드됩니다 — 이는 지향점이 아니라 반드시 지켜야 하는 요구 사항입니다.
@@ -213,10 +216,26 @@ srv.extends(websocket_endpoint_for("/ws", [](std::shared_ptr<ws::ws_connection> 
 핸드셰이크뿐만 아니라 완전한 RFC 6455 프레임 입출력(마스킹, 조각화, ping/pong, close
 핸드셰이크)까지 지원합니다.
 
+## TLS/SSL
+
+```cpp
+srv.listen_tls(endpoint(ip_address::loopback_v4(), 8443), "cert.pem", "key.pem");
+```
+
+OpenSSL과 `NHTTP_ENABLE_TLS`(기본값 켜짐)가 필요합니다. `listen_tls`는 `listen`의 워커별
+`SO_REUSEPORT` 바인딩을 그대로 반영하므로, TLS 엔드포인트도 평문 HTTP와 동일한 멀티쓰레드
+부하 분산을 얻습니다. 내부적으로 `tls_stream`은 `socket_stream`과 동일한 `io::stream`
+인터페이스를 구현합니다 — OpenSSL을 한 쌍의 메모리 내 BIO에 대해 구동하고 암호문을 커넥션
+자신의 비동기 스트림과 주고받으므로, TLS 핸드셰이크와 그 이후의 모든 읽기/쓰기가 평범한
+`co_await`가 되며 리액터 쓰레드를 절대 블로킹하지 않습니다. transport 레이어 위의 모든 것
+(라우팅, 확장, `overlay`, WebSocket 등)은 코드 변경 없이 TLS 위에서도 동일하게 동작합니다 —
+평문 HTTP와 HTTPS를 동시에 서빙하는 리스너의 실제 예제는 `examples/nhttpd/main.cpp`를
+참고하세요.
+
 ## 설계 문서
 
 * [CONCEPTS.md](CONCEPTS.ko.md) — 원래 구현으로부터 계승한 설계 철학과 불변조건들, 그리고 원래
-  구현이 남겨뒀던 공백(multipart 파싱, WebSocket 프레임, TLS).
+  구현이 남겨뒀던 공백(multipart 파싱, WebSocket 프레임, TLS) — 이번 재작성에서 전부 해소됨.
 * [USAGE.md](USAGE.ko.md) — 원래 구현의 실제 사용 패턴. "새 API가 여전히 같은 의도를 표현할 수
   있는가"를 판단하는 기준으로 사용됩니다.
 * [docs/protocol-extensibility.md](docs/protocol-extensibility.ko.md) — 현재 설계를, 향후

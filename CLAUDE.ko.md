@@ -63,8 +63,9 @@
 6. **Multipart/form-data 파싱과 WebSocket 프레임 송수신이 이번엔 진짜로 구현됩니다** — 기존
    구현은 이것들을 스텁으로만 남겨뒀습니다(form-data는 파서가 아예 없었음; WebSocket은 HTTP
    Upgrade 핸드셰이크만 완성했지 실제 프레임 입출력은 아니었음).
-7. **TLS/SSL은 이번 라운드의 범위 밖**이지만, stream/transport 추상화는 나중에 재설계 없이
-   TLS를 추가할 수 있도록 교체 가능한 상태로 유지되어야 합니다.
+7. ~~TLS/SSL은 이번 라운드의 범위 밖~~ — **대체됨**: TLS/SSL은 Phase 11에서 구현되었습니다
+   (아래 진행 로그 참고), 바로 이 결정이 유지하라고 요구했던 stream/transport 추상화 위에
+   그대로 얹혀서요. 그 추상화는 변경할 필요가 없었습니다.
 8. **HTTP/2와 QUIC은 구현되지 않지만**, 나중에 재설계 없이 추가할 수 있도록 세 가지
    아키텍처적 이음매가 보존되어야 합니다: (a) connection/exchange 분리 — 라우터와 핸들러
    코드는 커넥션당 요청 하나를 절대 가정하면 안 됨; (b) transport에 무관한 비동기 스트림
@@ -93,6 +94,8 @@ src/
   server/extensions/        extension registry, vhost, vpath, 정적 overlay, 단일 파일 서빙
   router/                   트라이 기반 라우터 (facade/route/middleware/target), xfwk의 후계자
   ws/                       WebSocket 핸드셰이크 + RFC6455 프레임 코덱 + 비동기 send/recv
+  tls/                      OpenSSL 기반 TLS/SSL (tls_context, tls_stream) — 메모리 BIO
+                             패턴, io::stream을 구현하므로 그대로 꽂히는 transport (Phase 11)
   depends/                  벤더링된 서드파티 (sha1, utf8) — 표준 시설로 간단히 대체 가능하지
                              않은 이상 그대로 재사용
 tests/
@@ -388,6 +391,60 @@ ctest --test-dir build --output-on-failure
     (`Copyright (c) 2021 neurnn corp` 줄이 제거됨). 조용히 커밋하거나 눈대중으로
     되돌리는 대신 사용자에게 명시적으로 드러냈고; 사용자는 현재 상태(줄이 제거된 상태)를
     유지하기로 확인했습니다.
+- **Phase 11 (TLS/SSL) — 완료.** Phase 10 이후에 사용자가 명시적으로 요청한, 기존 구현이 갖고
+  있던 공백들을 구현하는 작업의 일환으로 추가됨(`CONCEPTS.md`의 알려진 공백 목록 중 마지막
+  항목이 TLS였고, multipart와 WebSocket은 이미 Phase 3/7에서 완료됨). `src/tls/` +
+  `include/nhttp/tls/`: `tls_context`(`SSL_CTX*`를 감쌈, `create_server(cert_chain_file,
+  private_key_file)`, 최소 버전 `TLS1_2_VERSION`)와 `tls_stream`(`io::stream`을 구현하므로
+  `socket_stream`과 완전히 똑같은 방식으로 `connection`/`listener`에 그대로 꽂힘 — transport
+  레이어 위 어떤 것도 바꿀 필요가 없었고, 위 결정 #7의 이음매 설계가 유효했음을 확인함).
+  - **설계: `SSL_set_fd`가 아니라 메모리 BIO 쌍.** `tls_stream`은 SSL 객체를 소켓 fd에 직접
+    바인딩하는 대신 OpenSSL에 두 개의 `BIO_s_mem()` BIO를 줍니다(`SSL_set_bio`). 모든 OpenSSL
+    연산(`SSL_accept`/`SSL_read`/`SSL_write`)은 오직 이 메모리 내 BIO만 건드리며;
+    `tls_stream`이 `feed_rbio_from_network()`/`flush_wbio()`에서 이것과 실제 `io::stream`
+    사이의 암호문을 명시적으로 펌핑합니다(`co_await inner_->read/write(...)`). 이것이
+    OpenSSL을 리액터 스레드의 블로킹 경로에서 완전히 떼어놓는 핵심입니다 —
+    `SSL_ERROR_WANT_READ`/`WANT_WRITE`가 OpenSSL이 직접 fd를 `read()`/`write()`하려는 것이
+    아니라(리액터 스레드를 그대로 블로킹시킴 — 결정 #3의 협상 불가능한 불변조건 위반) 평범한
+    `co_await`로 바뀝니다.
+  - **`listener::listen_tls(ep, cert_chain_file, private_key_file)`**는 `listen()`의 워커별
+    `SO_REUSEPORT` 루프를 그대로 반영하며, 모든 워커 스레드가 `tls_context` 하나(`SSL_CTX*`
+    하나)를 공유합니다 — 설정이 끝난 뒤로는 읽기 전용인 `SSL_CTX`에서 여러 스레드가 동시에
+    `SSL_new()`를 호출하는 것은 OpenSSL 자체의 스레드 안전성 보장 범위 안입니다. `dispatch()`와
+    `run_connection()`을 기존의 평문 HTTP 전용이었던 `handle_connection()`에서 분리해서 평문과
+    TLS accept 경로 둘 다 하나의 커넥션 처리 구현을 공유하게 했습니다; transport 생성
+    (`socket_stream` 대 `socket_stream`을 감싼 `tls_stream`)만 다릅니다.
+  - **처음엔 오해를 불러일으켰던 긴 간헐적 실패 조사, 결국 라이브러리 버그가 **아님**으로
+    결론남.** 이 단계에서 실행 중인 `examples/nhttpd` 인스턴스를 상대로 수동으로
+    `curl -k https://...`를 스모크 테스트하는 동안 간헐적으로 실패했습니다(클라이언트 쪽
+    `SSL_ERROR_SYSCALL`, 시도의 약 50%, `strace` 아래에서는 더 심함), 반면 `openssl s_client`,
+    전용 블로킹 OpenSSL 테스트 클라이언트, 자동화된 Catch2 통합 스위트는 모두 안정적으로
+    통과했습니다. 근본 원인은(결국 `tls_stream`/`listener`의 배관/스레딩 버그가 전혀 아니었고)
+    **같은 오래 지속된 셸에서 이전의 수동 테스트 실행으로부터 남겨진 낡은 `nhttpd` 프로세스들**
+    이었습니다 — 백그라운드로 실행(`&`)한 뒤 같은 포트로 새 인스턴스를 시작하기 전에 명시적으로
+    죽이지 않아서, 이전 실행의 겹치는 포트에 여전히 `SO_REUSEPORT`로 바인딩된 채 남아있었던
+    것입니다. `SO_REUSEPORT`는 의도적으로 여러 독립적인 리스닝 소켓이 — 심지어 관계없고 이미
+    고아가 된 프로세스의 것이라도 — 한 포트를 공유하도록 허용하며, 커널은 *새* 커넥션을 그
+    전부에 걸쳐 로드밸런싱합니다; 낡은/절반쯤 죽은 인스턴스에 걸린 커넥션은 실패하는데, 이게
+    클라이언트 입장에서는 정확히 간헐적인 서버 쪽 버그처럼 보입니다. 조사 도중 `ps aux`로 그런
+    낡은 프로세스가 살아있는 걸 직접 찾아내서 확인했고, 그 다음 환경이 낡은 리스너로부터
+    깨끗하다는 걸 확인한 뒤에는 **100개 이상의 새 TLS 커넥션에서 실패 0건**을 재현함으로써
+    (curl과 테스트 클라이언트 둘 다, 순차적으로도 기본 8개 워커 전체에 걸친 동시 버스트로도)
+    확인했습니다. **이 저장소에서 향후 수동 스모크 테스트를 할 때의 교훈(WSL을 거쳐, 긴 세션에
+    걸쳐): 새 수동 테스트의 결과를 신뢰하기 전에 항상 이전의 `examples/nhttpd`(또는 고정되고
+    재사용되는 포트에 바인딩된 다른 어떤 테스트 바이너리든)가 아직 실행 중이지 않은지
+    확인하세요 — 매 수동 실행 전에 `pgrep -f build/examples/nhttpd`를 하거나, 모든 Catch2
+    통합 테스트가 이미 하고 있는 것처럼 포트 0(OS가 할당)을 사용하세요 — 이게 바로 자동화된
+    스위트가 전혀 영향받지 않았던 이유입니다.**
+  - 통합 테스트: `tests/integration/test_tls_server.cpp`(GET, POST 바디, keep-alive, 그리고
+    여러 워커에 걸쳐 퍼지는 다수의 새 커넥션 테스트)가 `tests/support/raw_tls_http_client.hpp`
+    를 사용합니다 — `nhttp::tls`의 자체 코드와 의도적으로 분리된 작고 독립적인 블로킹 OpenSSL
+    클라이언트로, 공유된 버그가 양쪽이 서로 동의하는 뒤에 숨을 수 없게 합니다.
+    `NHTTP_ENABLE_TLS`(CMake 옵션, 기본값 `ON`)가 OpenSSL `find_package` 요구사항과 위의 모든
+    것을 게이팅합니다; `NHTTP_HAVE_TLS`는 그 결과로 생기는 컴파일 정의로 `listener.hpp`/`.cpp`
+    와 예제 앱의 `#ifdef`들을 감쌉니다. `examples/nhttpd`는 인증서/키 경로 인자가 주어지면
+    선택적으로 `port+1`에서 HTTPS도 서빙합니다(`./nhttpd [dir] [port] [cert.pem] [key.pem]`).
+  - 전체 스위트: 이 단계 이후 100/100 경고 없이 통과.
 - 계획에 남은 것이 없습니다. 이 저장소의 향후 작업은 깨끗하고 완전히 테스트된 C++20 구현에서
   시작합니다 — 위의 모듈 맵과 빌드 안내를, 그리고 사용자 대상 API 투어는 `ReadMe.md`를
   참고하세요.

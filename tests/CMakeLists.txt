@@ -41,6 +41,10 @@ set(NHTTP_UNIT_TEST_SOURCES
 	integration/test_websocket_server.cpp
 )
 
+if(NHTTP_ENABLE_TLS)
+	list(APPEND NHTTP_UNIT_TEST_SOURCES integration/test_tls_server.cpp)
+endif()
+
 add_executable(nhttp_unit_tests ${NHTTP_UNIT_TEST_SOURCES})
 
 target_link_libraries(nhttp_unit_tests PRIVATE

@@ -8,7 +8,8 @@
 // and identical behavior over IPv4 and IPv6).
 //
 // Build: cmake --build build --target nhttpd
-// Run:   ./build/examples/nhttpd [directory-to-serve] [port]
+// Run:   ./build/examples/nhttpd [directory-to-serve] [port] [tls-cert.pem] [tls-key.pem]
+//        (the last two are optional; when given, HTTPS is also served on port+1)
 
 #include "nhttp/server/listener.hpp"
 #include "nhttp/server/extensions/overlay.hpp"
@@ -130,6 +131,20 @@ int main(int argc, char** argv) {
 
 	std::printf("nhttpd listening on 127.0.0.1:%u and [::1]:%u, serving '%s'\n", port, port, serve_dir.c_str());
 	std::printf("try: curl http://127.0.0.1:%u/whoami\n", port);
+
+#ifdef NHTTP_HAVE_TLS
+	if (argc > 4) {
+		const std::uint16_t tls_port = static_cast<std::uint16_t>(port + 1);
+
+		if (!srv.listen_tls(endpoint(ip_address::loopback_v4(), tls_port), argv[3], argv[4])) {
+			std::fprintf(stderr, "error: can't listen (tls): 127.0.0.1:%u (check cert/key paths)\n", tls_port);
+			return 1;
+		}
+
+		std::printf("nhttpd also listening (TLS) on 127.0.0.1:%u\n", tls_port);
+		std::printf("try: curl -k https://127.0.0.1:%u/whoami\n", tls_port);
+	}
+#endif
 
 	srv.run(); // blocks until POST /exit calls srv.stop()
 

@@ -63,8 +63,9 @@ The full redesign plan (architecture + phased build order) lives at
 6. **Multipart/form-data parsing and WebSocket frame send/receive are implemented for real**
    this time — the old implementation only stubbed these (form-data had no parser at all;
    WebSocket only completed the HTTP Upgrade handshake, not actual frame I/O).
-7. **TLS/SSL is out of scope for this round**, but the stream/transport abstraction must stay
-   swappable so TLS can be added later without a redesign.
+7. ~~TLS/SSL is out of scope for this round~~ — **superseded**: TLS/SSL was implemented in
+   Phase 11 (see the progress log below), exactly on top of the stream/transport abstraction
+   this decision called for keeping swappable. The abstraction did not need to change.
 8. **HTTP/2 and QUIC are not implemented**, but three architectural seams must be preserved
    so they can be added later without a redesign: (a) a connection/exchange split — router and
    handler code must never assume one request per connection; (b) a transport-agnostic async
@@ -93,6 +94,8 @@ src/
   server/extensions/        extension registry, vhost, vpath, static overlay, single-file serving
   router/                   trie-based router (facade/route/middleware/target), successor to xfwk
   ws/                       WebSocket handshake + RFC6455 frame codec + async send/recv
+  tls/                      TLS/SSL via OpenSSL (tls_context, tls_stream) — memory-BIO pattern,
+                             implements io::stream so it's a drop-in transport (Phase 11)
   depends/                  vendored third-party (sha1, utf8) — reused as-is unless trivially
                              replaceable by a standard facility
 tests/
@@ -382,6 +385,61 @@ zero compiler warnings before moving on.
     line removed) with no corresponding edit in this session's history. Surfaced to the user
     explicitly rather than silently committing or reverting it blind; user confirmed keeping
     the current (line-removed) state.
+- **Phase 11 (TLS/SSL) — done.** Added after Phase 10, at the user's explicit request to
+  implement the gaps the original implementation had (`CONCEPTS.md`'s known-gaps list — TLS was
+  the last one; multipart and WebSocket were already done in Phases 3/7). `src/tls/` +
+  `include/nhttp/tls/`: `tls_context` (wraps `SSL_CTX*`, `create_server(cert_chain_file,
+  private_key_file)`, `TLS1_2_VERSION` minimum) and `tls_stream` (implements `io::stream`,
+  so it drops into `connection`/`listener` exactly like `socket_stream` — no changes needed to
+  anything above the transport layer, confirming the seam decision #7 above was sound).
+  - **Design: memory-BIO pair, not `SSL_set_fd`.** `tls_stream` gives OpenSSL two
+    `BIO_s_mem()` BIOs (`SSL_set_bio`) instead of binding the SSL object directly to the socket
+    fd. Every OpenSSL operation (`SSL_accept`/`SSL_read`/`SSL_write`) only ever touches these
+    in-memory BIOs; `tls_stream` explicitly pumps ciphertext between them and the real
+    `io::stream` (`co_await inner_->read/write(...)`) in `feed_rbio_from_network()` /
+    `flush_wbio()`. This is what keeps OpenSSL entirely off the reactor thread's blocking path —
+    `SSL_ERROR_WANT_READ`/`WANT_WRITE` become ordinary `co_await`s on the underlying stream
+    instead of OpenSSL trying to `read()`/`write()` the fd itself, which would block a reactor
+    thread outright (violates the one non-negotiable invariant in decision #3).
+  - **`listener::listen_tls(ep, cert_chain_file, private_key_file)`** mirrors `listen()`'s
+    per-worker `SO_REUSEPORT` loop exactly, sharing one `tls_context` (one `SSL_CTX*`) across
+    all worker threads — safe per OpenSSL's own thread-safety guarantees for concurrent
+    `SSL_new()` from a read-only-after-setup `SSL_CTX`. `dispatch()` and `run_connection()` were
+    factored out of the old plain-HTTP-only `handle_connection()` so both the plain and TLS
+    accept paths share one connection-handling implementation; only the transport
+    construction (`socket_stream` vs `tls_stream` wrapping the same `socket_stream`) differs.
+  - **A long, initially-misleading intermittent-failure investigation, resolved as NOT a library
+    bug.** Manual `curl -k https://...` smoke-testing against a running `examples/nhttpd`
+    instance during this phase intermittently failed (`SSL_ERROR_SYSCALL` client-side, ~50% of
+    attempts, worse under `strace`), while `openssl s_client`, a dedicated blocking OpenSSL test
+    client, and the automated Catch2 integration suite all passed reliably. Root-caused (not a
+    plumbing/threading bug in `tls_stream`/`listener` at all) to **stale `nhttpd` processes left
+    running from earlier manual test invocations in the same long-lived shell**, still bound via
+    `SO_REUSEPORT` to an overlapping port from a previous run that was backgrounded (`&`) and
+    never explicitly killed before starting a new instance on the same port. `SO_REUSEPORT`
+    deliberately allows multiple independent listening sockets — even from unrelated,
+    now-orphaned processes — to share one port, and the kernel load-balances *new* connections
+    across all of them; a connection landing on the stale/half-shut-down instance fails, which
+    looks exactly like an intermittent server-side bug from the client's perspective. Confirmed
+    by finding such a leftover process alive via `ps aux` mid-investigation, and then by
+    reproducing **zero failures in 100+ fresh TLS connections** (both via `curl` and the test
+    client, sequential and concurrent bursts across all 8 default workers) once the environment
+    was verified clean of leftover listeners. **Lesson for future manual smoke-testing in this
+    repo (via WSL, across a long session): always confirm no previous `examples/nhttpd` (or any
+    other test binary bound to a fixed, reused port) is still running before trusting a new
+    manual test's results — `pgrep -f build/examples/nhttpd` before each manual run, or use port
+    0 (OS-assigned) the way every Catch2 integration test already does, which is why the
+    automated suite was never affected.**
+  - Integration tests: `tests/integration/test_tls_server.cpp` (GET, POST body, keep-alive, and
+    a many-fresh-connections-across-workers spread test) using `tests/support/
+    raw_tls_http_client.hpp` — a small independent blocking OpenSSL client kept deliberately
+    separate from `nhttp::tls`'s own code, so a shared bug couldn't hide behind both sides
+    agreeing with each other. `NHTTP_ENABLE_TLS` (CMake option, default `ON`) gates the
+    OpenSSL `find_package` requirement and all of the above; `NHTTP_HAVE_TLS` is the resulting
+    compile definition guarding the `#ifdef`s in `listener.hpp`/`.cpp` and the example app.
+    `examples/nhttpd` optionally also serves HTTPS on `port+1` when given cert/key path
+    arguments (`./nhttpd [dir] [port] [cert.pem] [key.pem]`).
+  - Full suite: 100/100 passing warning-free after this phase.
 - Nothing left on the plan. Future work on this repo starts from a clean, fully-tested C++20
   implementation — see the module map and build instructions above, and `ReadMe.md` for the
   user-facing API tour.

@@ -27,6 +27,7 @@ in [CONCEPTS.md](CONCEPTS.md), [USAGE.md](USAGE.md), and
 * [Virtual hosting](#virtual-hosting)
 * [Routing (the `router` module)](#routing-the-router-module)
 * [WebSocket](#websocket)
+* [TLS/SSL](#tlsssl)
 * [Design documents](#design-documents)
 
 ## License
@@ -63,6 +64,7 @@ self-contained implementations under the same license (see `src/ws/sha1.cpp`).
 * Linux (epoll-based reactor; no Windows support in this round)
 * GCC ≥ 11 or Clang ≥ 14 (C++20 coroutines)
 * CMake ≥ 3.20
+* OpenSSL (for TLS/SSL support; see `NHTTP_ENABLE_TLS` below to disable)
 
 ## Building
 
@@ -79,6 +81,7 @@ Build options (`-D<option>=ON|OFF` at configure time):
 | `NHTTP_BUILD_TESTS` | `ON` | Build the Catch2 test suite |
 | `NHTTP_BUILD_EXAMPLES` | `ON` | Build `examples/nhttpd` |
 | `NHTTP_WARNINGS_AS_ERRORS` | `ON` | Treat compiler warnings as errors |
+| `NHTTP_ENABLE_TLS` | `ON` | Build TLS/SSL support (requires OpenSSL) |
 
 The library builds warning-free under `-Wall -Wextra -Wpedantic` (plus several more, see
 `cmake/CompilerWarnings.cmake`) — this is a hard requirement, not aspirational.
@@ -214,10 +217,26 @@ srv.extends(websocket_endpoint_for("/ws", [](std::shared_ptr<ws::ws_connection> 
 Full RFC 6455 frame I/O (masking, fragmentation, ping/pong, close handshake) — not just the
 handshake.
 
+## TLS/SSL
+
+```cpp
+srv.listen_tls(endpoint(ip_address::loopback_v4(), 8443), "cert.pem", "key.pem");
+```
+
+Requires OpenSSL and `NHTTP_ENABLE_TLS` (on by default). `listen_tls` mirrors `listen`'s
+per-worker `SO_REUSEPORT` binding, so a TLS endpoint gets the same multi-threaded load
+distribution as plain HTTP. Internally, `tls_stream` implements the same `io::stream` interface
+as `socket_stream` — it drives OpenSSL against a pair of in-memory BIOs and pumps ciphertext to
+and from the connection's own async stream, so the TLS handshake and every subsequent read/write
+are ordinary `co_await`s and never block a reactor thread. Everything above the transport layer
+(routing, extensions, `overlay`, WebSocket, etc.) works identically over TLS with no code
+changes — see `examples/nhttpd/main.cpp` for a listener that serves both plain HTTP and HTTPS.
+
 ## Design documents
 
 * [CONCEPTS.md](CONCEPTS.md) — the design philosophy and invariants carried forward from the
-  original implementation, and the gaps (multipart parsing, WebSocket frames, TLS) it left open.
+  original implementation, and the gaps (multipart parsing, WebSocket frames, TLS) it left open,
+  all since closed in this rewrite.
 * [USAGE.md](USAGE.md) — the original implementation's observable usage patterns, used as the
   spec for "does the new API still let a caller express the same intent."
 * [docs/protocol-extensibility.md](docs/protocol-extensibility.md) — a review of the current

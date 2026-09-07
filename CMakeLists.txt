@@ -33,8 +33,20 @@ endif()
 option(NHTTP_BUILD_TESTS "Build the nhttp unit/integration test suite" ON)
 option(NHTTP_BUILD_EXAMPLES "Build the nhttp example applications" ON)
 option(NHTTP_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+option(NHTTP_ENABLE_TLS "Build TLS/SSL support (requires OpenSSL)" ON)
 
 include(cmake/CompilerWarnings.cmake)
+
+if(NHTTP_ENABLE_TLS)
+	find_package(OpenSSL)
+
+	if(NOT OpenSSL_FOUND)
+		message(FATAL_ERROR
+			"NHTTP_ENABLE_TLS is ON but OpenSSL was not found. "
+			"Install libssl-dev (Debian/Ubuntu) or the equivalent, or configure with -DNHTTP_ENABLE_TLS=OFF."
+		)
+	endif()
+endif()
 
 add_subdirectory(src)
 

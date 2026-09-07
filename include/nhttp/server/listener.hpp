@@ -9,6 +9,10 @@
 #include "../platform/address.hpp"
 #include "../platform/socket.hpp"
 
+#ifdef NHTTP_HAVE_TLS
+#include "../tls/context.hpp"
+#endif
+
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -41,6 +45,16 @@ namespace nhttp::server {
 
 		std::optional<platform::endpoint> local_endpoint() const noexcept { return bound_endpoint_; }
 
+#ifdef NHTTP_HAVE_TLS
+		/* same as listen(), but every accepted connection on this endpoint
+		 * first completes a TLS server handshake (certificate chain + private
+		 * key loaded from PEM files) before any HTTP is read from it. requires
+		 * building with NHTTP_ENABLE_TLS (the default; needs OpenSSL). */
+		bool listen_tls(const platform::endpoint& ep, const std::string& cert_chain_file, const std::string& private_key_file);
+
+		std::optional<platform::endpoint> tls_local_endpoint() const noexcept { return tls_bound_endpoint_; }
+#endif
+
 		/* the terminal fallback used when no extension accepts a request. */
 		void set_handler(handler_type handler) { handler_ = std::move(handler); }
 
@@ -57,8 +71,16 @@ namespace nhttp::server {
 		void stop();
 
 	private:
+		async::task<response> dispatch(request& req);
+		async::task<void> run_connection(async::io_context& ctx, std::shared_ptr<io::stream> wire);
+
 		async::detached_task accept_loop(async::io_context& ctx, platform::socket_handle listen_handle);
 		async::detached_task handle_connection(async::io_context& ctx, async::async_socket sock);
+
+#ifdef NHTTP_HAVE_TLS
+		async::detached_task accept_loop_tls(async::io_context& ctx, platform::socket_handle listen_handle, std::shared_ptr<tls::tls_context> tls_ctx);
+		async::detached_task handle_connection_tls(async::io_context& ctx, async::async_socket sock, std::shared_ptr<tls::tls_context> tls_ctx);
+#endif
 
 	private:
 		params params_;
@@ -69,6 +91,9 @@ namespace nhttp::server {
 
 		std::atomic<std::size_t> active_connections_{ 0 };
 		std::optional<platform::endpoint> bound_endpoint_;
+#ifdef NHTTP_HAVE_TLS
+		std::optional<platform::endpoint> tls_bound_endpoint_;
+#endif
 
 		std::mutex run_mutex_;
 		std::condition_variable run_cv_;

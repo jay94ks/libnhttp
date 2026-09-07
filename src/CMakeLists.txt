@@ -42,6 +42,13 @@ set(NHTTP_SOURCES
 	server/extensions/websocket_endpoint.cpp
 )
 
+if(NHTTP_ENABLE_TLS)
+	list(APPEND NHTTP_SOURCES
+		tls/context.cpp
+		tls/stream.cpp
+	)
+endif()
+
 add_library(nhttp STATIC ${NHTTP_SOURCES})
 add_library(nhttp::nhttp ALIAS nhttp)
 
@@ -64,3 +71,8 @@ target_compile_definitions(nhttp PRIVATE
 	NHTTP_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 	NHTTP_VERSION_STRING="${PROJECT_VERSION}"
 )
+
+if(NHTTP_ENABLE_TLS)
+	target_link_libraries(nhttp PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+	target_compile_definitions(nhttp PUBLIC NHTTP_HAVE_TLS)
+endif()
