@@ -4,3 +4,9 @@ nhttpd/nhttpd.vcxproj.user
 x64
 Binaries
 Immediate
+
+# CMake (new build system)
+build/
+out/
+CMakeUserPresets.json
+compile_commands.json
