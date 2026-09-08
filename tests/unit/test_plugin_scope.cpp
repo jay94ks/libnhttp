@@ -44,6 +44,34 @@ namespace {
 		std::string label_;
 	};
 
+	/* records on_begin/on_end calls like recording_plugin, but can be
+	 * configured to throw from either -- used to pin down plugin_scope's
+	 * exception-ordering guarantees precisely. */
+	class throwing_plugin final : public plugin {
+	public:
+		bool throw_on_begin = false;
+		bool throw_on_end = false;
+		std::shared_ptr<std::vector<std::string>> events = std::make_shared<std::vector<std::string>>();
+
+		task<void> on_begin(request&) override {
+			events->push_back("begin");
+
+			if (throw_on_begin)
+				throw std::runtime_error("on_begin boom");
+
+			co_return;
+		}
+
+		task<void> on_end(request&) override {
+			events->push_back("end");
+
+			if (throw_on_end)
+				throw std::logic_error("on_end boom");
+
+			co_return;
+		}
+	};
+
 }
 
 TEST_CASE("plugin_scope calls on_begin before and on_end after a successful handler", "[plugin][plugin_scope]") {
@@ -102,4 +130,73 @@ TEST_CASE("two plugin_scopes on one route nest with the last-prepended one outer
 	sync_wait(stack.handle(req, t));
 
 	REQUIRE(*shared_events == std::vector<std::string>{"b-begin", "a-begin", "a-end", "b-end"});
+}
+
+TEST_CASE("plugin_scope does not call on_end if on_begin itself throws, and the wrapped handler never runs", "[plugin][plugin_scope]") {
+	auto p = std::make_shared<throwing_plugin>();
+	p->throw_on_begin = true;
+
+	middleware_stack stack;
+	stack.prepend(std::make_shared<plugin_scope>(p));
+
+	bool handler_called = false;
+	auto t = target_by([&handler_called](request&) {
+		handler_called = true;
+		return make_response("ok");
+	});
+
+	request req;
+
+	REQUIRE_THROWS_AS(sync_wait(stack.handle(req, t)), std::runtime_error);
+	REQUIRE_FALSE(handler_called);
+	REQUIRE(*p->events == std::vector<std::string>{"begin"}); // on_end never ran -- nothing was acquired to release
+}
+
+TEST_CASE("plugin_scope propagates on_end's own exception when the handler succeeded", "[plugin][plugin_scope]") {
+	auto p = std::make_shared<throwing_plugin>();
+	p->throw_on_end = true;
+
+	middleware_stack stack;
+	stack.prepend(std::make_shared<plugin_scope>(p));
+
+	auto t = target_by([](request&) { return make_response("ok"); });
+
+	request req;
+
+	REQUIRE_THROWS_AS(sync_wait(stack.handle(req, t)), std::logic_error);
+	REQUIRE(*p->events == std::vector<std::string>{"begin", "end"});
+}
+
+TEST_CASE("plugin_scope swallows a secondary exception from on_end when the handler already failed", "[plugin][plugin_scope]") {
+	auto p = std::make_shared<throwing_plugin>();
+	p->throw_on_end = true;
+
+	middleware_stack stack;
+	stack.prepend(std::make_shared<plugin_scope>(p));
+
+	auto t = target_by([](request&) -> response {
+		throw std::runtime_error("handler boom");
+	});
+
+	request req;
+
+	// std::runtime_error (the handler's real failure), not std::logic_error
+	// (on_end's secondary one) -- cleanup failing during unwind must not
+	// replace/mask what actually went wrong.
+	REQUIRE_THROWS_AS(sync_wait(stack.handle(req, t)), std::runtime_error);
+	REQUIRE(*p->events == std::vector<std::string>{"begin", "end"});
+}
+
+TEST_CASE("a default plugin::plugin with no overrides is a transparent passthrough", "[plugin][plugin_scope]") {
+	auto p = std::make_shared<plugin>(); // plugin is concrete: all four hooks are non-pure no-ops.
+
+	middleware_stack stack;
+	stack.prepend(std::make_shared<plugin_scope>(p));
+
+	auto t = target_by([](request&) { return make_response("passthrough ok"); });
+
+	request req;
+	response r = sync_wait(stack.handle(req, t));
+
+	REQUIRE(r.content_length == static_cast<std::int64_t>(std::string("passthrough ok").size()));
 }

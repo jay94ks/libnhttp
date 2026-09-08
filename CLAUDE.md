@@ -1050,16 +1050,35 @@ zero compiler warnings, **on both platforms**, before moving on.
     fallback) — no new low-level plumbing needed. Call-site shape is entirely user-code-side, no
     `listener` API change: `plugins.init_all(srv); srv.run(); plugins.deinit_all(srv);` (`run()`
     already blocks until `stop()`, so `deinit_all()` after it is correctly ordered for free).
-  - **Verified, not just compiled**: 4 new tests (119 → 123 on Linux, 115 → 119 on Windows, both
-    warning-free) — `tests/unit/test_plugin_scope.cpp` (begin-then-end on success; `on_end` still
-    fires and the original exception still propagates when the handler throws, driven via
-    `async::sync_wait` directly rather than a real socket, since an uncaught exception from a
-    handler isn't caught anywhere in the real connection-dispatch path and would risk
-    `std::terminate` in the test binary if driven that way; two `plugin_scope`s on one route nest
-    with the later-`prepend()`-ed one outermost, inherited `middleware_stack` behavior, not new)
-    and `tests/integration/test_plugin_lifecycle.cpp` (a real `listener`, `on_init`/`on_deinit`
-    each doing a real `io_context::sleep_for(...)` to prove the bootstrap context genuinely drives
-    async work, asserting call order: init before any request, deinit after `stop()` returns).
+  - **Verified, not just compiled**: 4 new tests initially (119 → 123 on Linux, 115 → 119 on
+    Windows), then 8 more at the user's explicit follow-up request for deeper unit coverage
+    (→ 131 Linux, → 127 Windows), all warning-free —
+    - `tests/unit/test_plugin_scope.cpp`: begin-then-end on success; `on_end` still fires and the
+      original exception still propagates when the handler throws; two `plugin_scope`s on one
+      route nest with the later-`prepend()`-ed one outermost (inherited `middleware_stack`
+      behavior, not new); and, from the follow-up round, the three exception-ordering cases the
+      first pass only implemented but never actually pinned down with a test — `on_begin` itself
+      throwing means `on_end` never runs and the wrapped handler never executes; `on_end` throwing
+      when the handler *succeeded* propagates `on_end`'s own exception; `on_end` throwing when the
+      handler *also* failed swallows `on_end`'s secondary exception and propagates the handler's
+      real one — plus a passthrough sanity check that a default `plugin::plugin` with no overrides
+      (it's concrete, not abstract) doesn't disturb the response. All driven via `async::sync_wait`
+      directly rather than a real socket, since an uncaught exception from a handler isn't caught
+      anywhere in the real connection-dispatch path and would risk `std::terminate` in the test
+      binary if driven that way.
+    - `tests/unit/test_plugin_manager.cpp` (new in the follow-up round): `plugin_manager` treats
+      the `listener&` it's handed as a fully opaque pass-through (never dereferences it), so these
+      construct a `listener` that's never `listen()`'d or `run()`, exercising `on_init`/
+      `on_deinit` ordering (attach order forward, reverse order back), the empty-plugin-list
+      no-op case, and — with a second, independent plugin whose hooks do a real
+      `io_context::sleep_for(...)` rather than just a synchronous log push — that ordering still
+      holds when every plugin's hook is a genuine async operation, not just a plain call, entirely
+      in isolation from `listener`/HTTP mechanics (the existing integration test already covers
+      that layer; this covers `plugin_manager` on its own).
+    - `tests/integration/test_plugin_lifecycle.cpp`: a real `listener`, `on_init`/`on_deinit` each
+      doing a real `io_context::sleep_for(...)` to prove the bootstrap context genuinely drives
+      async work, asserting call order against real HTTP traffic: init before any request, deinit
+      after `stop()` returns.
     Manually smoke-tested on both platforms with `examples/nhttpd`'s new `counter_plugin` (a
     trivial stand-in for a real resource-owning plugin — see its class comment): repeated
     `GET /counted` increments correctly across requests via `on_begin`, and `on_init`/`on_deinit`

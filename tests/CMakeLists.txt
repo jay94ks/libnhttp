@@ -44,6 +44,7 @@ set(NHTTP_UNIT_TEST_SOURCES
 	integration/test_websocket_server.cpp
 	unit/test_hpack.cpp
 	unit/test_plugin_scope.cpp
+	unit/test_plugin_manager.cpp
 	integration/test_plugin_lifecycle.cpp
 )
 

@@ -1047,17 +1047,35 @@ ctest --test-dir build-win --output-on-failure
     필요 없습니다. 호출부 형태는 전적으로 사용자 코드 쪽이고 `listener` API 변경이 없습니다:
     `plugins.init_all(srv); srv.run(); plugins.deinit_all(srv);`(`run()`이 이미 `stop()`까지
     블로킹하므로, 그 뒤의 `deinit_all()`은 순서가 공짜로 맞습니다).
-  - **컴파일만이 아니라 검증까지**: 새 테스트 4개(리눅스 119 → 123, Windows 115 → 119, 둘 다
-    경고 없이) — `tests/unit/test_plugin_scope.cpp`(성공 시 begin-그다음-end; 핸들러가 던져도
-    `on_end`가 여전히 실행되고 원래 예외가 여전히 전파됨 — 진짜 소켓이 아니라 `async::sync_wait`
-    로 직접 구동했는데, 실제 커넥션 디스패치 경로 어디에서도 핸들러의 uncaught 예외를 잡지
-    않아서 그런 식으로 구동하면 테스트 바이너리에서 `std::terminate`가 날 위험이 있기
-    때문입니다; 한 라우트에 `plugin_scope` 두 개가 있으면 나중에 `prepend()`된 쪽이 가장
-    바깥쪽으로 중첩되는데, 이건 새로 만든 게 아니라 물려받은 `middleware_stack` 동작입니다)와
-    `tests/integration/test_plugin_lifecycle.cpp`(진짜 `listener`로, `on_init`/`on_deinit`
-    각각이 진짜 `io_context::sleep_for(...)`를 해서 부트스트랩 컨텍스트가 진짜로 비동기
-    작업을 돌린다는 걸 증명하고, 호출 순서를 확인합니다: 어떤 요청보다도 먼저 init, `stop()`이
-    반환한 뒤에 deinit). `examples/nhttpd`의 새 `counter_plugin`(진짜 리소스를 소유하는
+  - **컴파일만이 아니라 검증까지**: 처음엔 새 테스트 4개(리눅스 119 → 123, Windows 115 → 119),
+    그다음 사용자가 후속으로 더 깊은 단위 테스트 커버리지를 명시적으로 요청해서 8개가 더
+    추가됐고(→ 리눅스 131, → Windows 127), 전부 경고 없이 통과합니다 —
+    - `tests/unit/test_plugin_scope.cpp`: 성공 시 begin-그다음-end; 핸들러가 던져도 `on_end`가
+      여전히 실행되고 원래 예외가 여전히 전파됨; 한 라우트에 `plugin_scope` 두 개가 있으면
+      나중에 `prepend()`된 쪽이 가장 바깥쪽으로 중첩됨(새로 만든 게 아니라 물려받은
+      `middleware_stack` 동작); 그리고 후속 라운드에서, 첫 번째 라운드가 구현만 해두고 실제로
+      테스트로 못박아두진 않았던 세 가지 예외 순서 케이스 — `on_begin` 자체가 던지면 `on_end`가
+      절대 실행되지 않고 감싸인 핸들러도 절대 실행되지 않음; 핸들러가 *성공했는데* `on_end`가
+      던지면 `on_end` 자신의 예외가 전파됨; 핸들러도 *실패했는데* `on_end`도 던지면 `on_end`의
+      이차 예외는 삼켜지고 핸들러의 진짜 예외가 전파됨 — 여기에 오버라이드 없는 기본
+      `plugin::plugin`(추상이 아니라 구체 클래스입니다)이 응답을 건드리지 않는다는 통과
+      확인용 테스트도 추가했습니다. 전부 진짜 소켓이 아니라 `async::sync_wait`로 직접
+      구동했는데, 실제 커넥션 디스패치 경로 어디에서도 핸들러의 uncaught 예외를 잡지 않아서
+      그런 식으로 구동하면 테스트 바이너리에서 `std::terminate`가 날 위험이 있기 때문입니다.
+    - `tests/unit/test_plugin_manager.cpp`(후속 라운드에서 새로 추가): `plugin_manager`는
+      자기가 받은 `listener&`를 완전히 불투명하게 그대로 전달만 할 뿐 절대 역참조하지
+      않으므로, 이 테스트들은 `listen()`도 `run()`도 한 적 없는 `listener`를 만들어서
+      `on_init`/`on_deinit` 순서(attach 순서로 전진, 역순으로 후진), 플러그인이 하나도 없을
+      때의 아무 일도 안 하는 케이스를 확인하고 — 단순 동기 로그 push가 아니라 진짜
+      `io_context::sleep_for(...)`를 하는 독립된 두 번째 플러그인으로, 모든 플러그인의 훅이
+      진짜 비동기 연산일 때도 순서가 여전히 유지되는지까지 `listener`/HTTP 메커니즘과는 완전히
+      분리된 채로 확인합니다(그 계층은 기존 통합 테스트가 이미 커버하고 있으니, 이건
+      `plugin_manager` 그 자체만 따로 커버합니다).
+    - `tests/integration/test_plugin_lifecycle.cpp`: 진짜 `listener`로, `on_init`/`on_deinit`
+      각각이 진짜 `io_context::sleep_for(...)`를 해서 부트스트랩 컨텍스트가 진짜로 비동기
+      작업을 돌린다는 걸 증명하고, 실제 HTTP 트래픽을 상대로 호출 순서를 확인합니다: 어떤
+      요청보다도 먼저 init, `stop()`이 반환한 뒤에 deinit.
+    `examples/nhttpd`의 새 `counter_plugin`(진짜 리소스를 소유하는
     플러그인의 사소한 대역 — 자신의 클래스 주석 참고)으로 두 플랫폼 모두 수동으로 스모크
     테스트했습니다: 반복된 `GET /counted`가 `on_begin`을 통해 요청마다 올바르게 증가하고,
     `on_init`/`on_deinit`이 `POST /exit` 주변의 정확한 시점에 로그를 남깁니다.
