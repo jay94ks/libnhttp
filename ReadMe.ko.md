@@ -25,11 +25,13 @@ C++20 코루틴 기반의 이벤트 드리븐 HTTP/1.1 **및 HTTP/2** 서버 라
 * [정적 파일 서빙](#정적-파일-서빙)
 * [가상 호스팅](#가상-호스팅)
 * [라우팅 (`router` 모듈)](#라우팅-router-모듈)
+* [플러그인 시스템](#플러그인-시스템)
 * [WebSocket](#websocket)
 * [TLS/SSL](#tlsssl)
 * [리버스 프록시](#리버스-프록시)
 * [HTTP/2](#http2)
 * [Windows](#windows)
+* [벤치마크](#벤치마크)
 * [설계 문서](#설계-문서)
 
 ## 라이선스
@@ -158,6 +160,8 @@ src/server/      listener, HTTP/1.1 connection과 HTTP/2 connection_h2 (각각 �
                  없이 코루틴 하나로 표현), request/response, extension registry,
                  vhost/vpath/overlay/single_file/reverse_proxy
 src/router/      REST 라우터: 경로 트라이, 플루언트 등록 DSL, 미들웨어, 그룹핑
+src/plugin/      교차 관심사(예: DB 커넥션 풀)를 위한 서버 생명주기 + 요청별 스코프 훅.
+                 router의 미들웨어 위에 얹혀 있고, 별도 메커니즘이 아님
 src/ws/          WebSocket 핸드셰이크 + 실제 RFC 6455 프레임 입출력
 src/http2/       HPACK (RFC 7541) + 프레임 코덱 (RFC 9113)
 ```
@@ -236,15 +240,15 @@ struct db_connection_tag { mysql_connection conn; };
 
 class mysql_plugin final : public plugin::plugin {
 public:
-	task<void> on_init(listener&, io_context& ctx) override {
+	async::task<void> on_init(listener&, async::io_context& ctx) override {
 		pool_ = co_await mysql_pool::connect(ctx, "db.internal", ...);
 	}
 
-	task<void> on_begin(request& req) override {
+	async::task<void> on_begin(request& req) override {
 		req.tags.ensure<db_connection_tag>().conn = co_await pool_->acquire();
 	}
 
-	task<void> on_end(request& req) override {
+	async::task<void> on_end(request& req) override {
 		co_await pool_->release(std::move(req.tags.get<db_connection_tag>()->conn));
 	}
 

@@ -25,11 +25,13 @@ in [CONCEPTS.md](CONCEPTS.md), [USAGE.md](USAGE.md), and
 * [Static file serving](#static-file-serving)
 * [Virtual hosting](#virtual-hosting)
 * [Routing (the `router` module)](#routing-the-router-module)
+* [Plugin system](#plugin-system)
 * [WebSocket](#websocket)
 * [TLS/SSL](#tlsssl)
 * [Reverse proxy](#reverse-proxy)
 * [HTTP/2](#http2)
 * [Windows](#windows)
+* [Benchmarks](#benchmarks)
 * [Design documents](#design-documents)
 
 ## License
@@ -156,6 +158,8 @@ src/server/      listener, HTTP/1.1 connection and HTTP/2 connection_h2 (one cor
                  no state-machine enum), request/response, the extension registry,
                  vhost/vpath/overlay/single_file/reverse_proxy
 src/router/      the REST router: path trie, fluent registration DSL, middleware, grouping
+src/plugin/      server-lifecycle + per-request-scope hooks for cross-cutting functionality
+                 (e.g. a DB connection pool), built on router's middleware, not a separate one
 src/ws/          WebSocket handshake + real RFC 6455 frame I/O
 src/http2/       HPACK (RFC 7541) + frame codec (RFC 9113)
 ```
@@ -235,15 +239,15 @@ struct db_connection_tag { mysql_connection conn; };
 
 class mysql_plugin final : public plugin::plugin {
 public:
-	task<void> on_init(listener&, io_context& ctx) override {
+	async::task<void> on_init(listener&, async::io_context& ctx) override {
 		pool_ = co_await mysql_pool::connect(ctx, "db.internal", ...);
 	}
 
-	task<void> on_begin(request& req) override {
+	async::task<void> on_begin(request& req) override {
 		req.tags.ensure<db_connection_tag>().conn = co_await pool_->acquire();
 	}
 
-	task<void> on_end(request& req) override {
+	async::task<void> on_end(request& req) override {
 		co_await pool_->release(std::move(req.tags.get<db_connection_tag>()->conn));
 	}
 
