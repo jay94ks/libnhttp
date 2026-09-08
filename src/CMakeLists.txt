@@ -38,6 +38,8 @@ set(NHTTP_SOURCES
 	router/group_proxy.cpp
 	router/route.cpp
 	router/router.cpp
+	plugin/plugin_scope.cpp
+	plugin/plugin_manager.cpp
 	ws/sha1.cpp
 	ws/handshake.cpp
 	ws/connection.cpp

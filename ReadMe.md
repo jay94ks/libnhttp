@@ -208,7 +208,7 @@ router->group([](facade_ptr inner) {
 		co_return make_response(std::move(body));
 	}));
 
-	inner->param(":user", [](const std::string& name) {
+	inner->param(":user", [](std::string_view name) {
 		return name == "jay" || name == "kay";
 	});
 })->prepend(std::make_shared<my_logging_middleware>());
@@ -219,6 +219,61 @@ srv.extends(router);
 Matching priority per path segment is **static child → deepest-matching parameter child →
 wildcard** — this exact tie-break was the subject of a real, previously-shipped bug, and is
 locked in by a dedicated regression test (`tests/unit/test_router_route.cpp`).
+
+## Plugin system
+
+For cross-cutting functionality that needs both a place to hook the *server's own* lifecycle
+(e.g. a database connection pool, created once at startup and torn down once at shutdown) and a
+before/after hook scoped to just the specific routes that use it, with access to that request's
+own tag storage to hand the route a resource — implement `nhttp::plugin::plugin` and attach it two
+ways: to the server (for `on_init`/`on_deinit`) via `plugin_manager`, and to specific routes (for
+`on_begin`/`on_end`) via `plugin_scope`, the same `router::middleware`/`prepend()` mechanism used
+for any other middleware:
+
+```cpp
+struct db_connection_tag { mysql_connection conn; };
+
+class mysql_plugin final : public plugin::plugin {
+public:
+	task<void> on_init(listener&, io_context& ctx) override {
+		pool_ = co_await mysql_pool::connect(ctx, "db.internal", ...);
+	}
+
+	task<void> on_begin(request& req) override {
+		req.tags.ensure<db_connection_tag>().conn = co_await pool_->acquire();
+	}
+
+	task<void> on_end(request& req) override {
+		co_await pool_->release(std::move(req.tags.get<db_connection_tag>()->conn));
+	}
+
+private:
+	std::shared_ptr<mysql_pool> pool_;
+};
+
+auto mysql = std::make_shared<mysql_plugin>();
+plugin::plugin_manager plugins;
+plugins.attach(mysql);
+
+router->group([](facade_ptr inner) {
+	inner->get(":user/profile", target_by([](request& req) {
+		auto& conn = req.tags.get<db_connection_tag>()->conn; // set by mysql_plugin::on_begin
+		return make_response(query_profile(conn, route_of(req).captures.at(":user")));
+	}));
+})->prepend(std::make_shared<plugin::plugin_scope>(mysql));
+
+srv.extends(router);
+
+plugins.init_all(srv);
+srv.run();              // blocks until stop()
+plugins.deinit_all(srv);
+```
+
+`on_end` always runs to match `on_begin`, even if the wrapped handler threw, so a plugin can rely
+on it to release whatever `on_begin` acquired regardless of how the handler finished. Unlike
+`server::extension` (tried for *every* request at the listener level), `on_begin`/`on_end` only
+wrap routes explicitly opted in via `plugin_scope` — a plugin with no server-wide setup can skip
+`on_init`/`on_deinit` entirely, and one with no per-request state can skip `on_begin`/`on_end`.
 
 ## WebSocket
 

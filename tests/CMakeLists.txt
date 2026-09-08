@@ -43,6 +43,8 @@ set(NHTTP_UNIT_TEST_SOURCES
 	unit/test_ws_connection.cpp
 	integration/test_websocket_server.cpp
 	unit/test_hpack.cpp
+	unit/test_plugin_scope.cpp
+	integration/test_plugin_lifecycle.cpp
 )
 
 if(NHTTP_ENABLE_TLS)

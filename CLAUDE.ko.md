@@ -113,6 +113,9 @@ src/
   server/extensions/        extension registry, vhost, vpath, 정적 overlay, 단일 파일 서빙,
                              reverse_proxy (Phase 13)
   router/                   트라이 기반 라우터 (facade/route/middleware/target), xfwk의 후계자
+  plugin/                   플러그인 시스템 (Phase 19) — 서버 생명주기 + 요청별 스코프 훅으로
+                             교차 관심사(예: DB 커넥션 풀)를 위한 것. router::middleware 위에
+                             전적으로 얹혀 있고, 별도 메커니즘이 아님
   ws/                       WebSocket 핸드셰이크 + RFC6455 프레임 코덱 + 비동기 send/recv
   tls/                      OpenSSL 기반 TLS/SSL (tls_context, tls_stream) — 메모리 BIO
                              패턴, io::stream을 구현하므로 그대로 꽂히는 transport; 서버
@@ -998,6 +1001,66 @@ ctest --test-dir build-win --output-on-failure
     끝내지 못한 것을 전부 마무리했습니다. 이 저장소의 향후 성능 작업은 깨끗한 `PLAN.md`에서
     시작합니다(QUIC/HTTP-3 관련이거나 이미 명시적으로 범위 밖으로 기록된 것들은 그대로 별도로
     추적됩니다).
+- **Phase 19(플러그인 시스템) — 완료.** 사용자의 명시적 요청으로, `EnterPlanMode`로 설계하고
+  구현 전에 확정받았습니다(진짜 아키텍처 추가이므로, 위 아키텍처 결정 로그와 같은 기준으로).
+  새 `src/plugin/` + `include/nhttp/plugin/` 모듈이고, 전적으로 추가적입니다 —
+  `server::extension`, `router::middleware`, `tag_storage`, `listener`의 요청 디스패치 경로
+  전부 손대지 않았습니다.
+  - **이게 해결하는 문제**: 기존의 두 조합 메커니즘 중 어느 것도, 교차 관심사(사용자 자신의
+    예시: MySQL 커넥션 풀)에게 *서버 자신의* 생명주기(시작 시 한 번, 종료 시 한 번)를 걸
+    자리를 주면서 *동시에* 그걸 쓰는 특정 라우트에만 스코프된 전/후 훅을 주고 그 요청 자신의
+    태그 저장소에 접근해 라우트에 리소스를 건네줄 방법을 제공하지 않았습니다.
+    `server::extension`은 리스너 수준에서 *모든* 요청마다 자신의 `wants()`/`handle()`을
+    돌리고, `router::middleware`는 이미 매치된 라우트의 타겟을 감싸지만, 그 무엇도 플러그인
+    자신의 init/deinit 이야기와 엮여 있지 않았습니다.
+  - **`plugin::plugin`** (`include/nhttp/plugin/plugin.hpp`): non-pure에 빈 본문인 코루틴 훅
+    4개 — 서버에 묶인 `on_init(listener&, io_context&)` / `on_deinit(listener&, io_context&)`,
+    요청별 "스코프"에 묶인 `on_begin(request&)` / `on_end(request&)`. 플러그인은 자기가 필요한
+    것만 오버라이드합니다. `on_init`/`on_deinit`이 listener뿐 아니라 살아있는 `io_context&`도
+    받는 이유는 정확히, 플러그인이 여기서 진짜 비동기 I/O(예: DB 연결)를 할 수 있게 하기
+    위해서입니다 — 승인된 계획이 처음에 빠뜨렸다가 구현 *도중에* 발견해서 고친 진짜 공백입니다:
+    `async::async_socket`을 만들려면 진짜로 돌고 있는 컨텍스트가 필요한데, `listener::run()`이
+    시작하기 전에 다른 어떤 것도 그걸 제공하지 않습니다.
+  - **`plugin::plugin_scope`** (`plugin_scope.hpp`/`.cpp`): `router::middleware` 어댑터 — 특정
+    라우트에 `on_begin`/`on_end`를 스코프하는 *전체* 메커니즘이고, `middleware`/
+    `middleware_stack`/`group()`/`prepend()`를 그대로 재사용합니다(그중 무엇도 바뀌지
+    않았습니다). `on_end`는 감싸인 핸들러가 던지더라도 `on_begin`과 짝을 맞춰 항상
+    실행되는데, 구현 도중에 진짜 수정이 필요했습니다: **C++20은 `catch` 핸들러 안에서
+    `co_await`를 금지합니다**(`[expr.await]` — GCC가 "await expressions are not permitted in
+    handlers"라고 직접 진단합니다), 그래서 첫 버전(`catch (...) { co_await plugin_->on_end(req);
+    throw; }` 안에서 비동기 정리 호출)은 컴파일되지 않습니다. `catch` 안에서는(거기선
+    `co_await`가 없음) `std::exception_ptr`로 핸들러의 예외를 캡처하고, `on_end`는 그 뒤에
+    catch 블록 *밖의* 자신만의 `try`에서 돌린 뒤(거기선 다시 `co_await`가 합법) 조건부로
+    다시 던지는 방식으로 고쳤습니다 — 이게 원래 설계보다 더 잘 정의된 이차 예외 동작을 자연스럽게
+    만들어주기도 했습니다: 핸들러가 실패했는데 정리하다가 `on_end`도 던지면 `on_end`의 예외는
+    삼켜지고("언와인딩 중엔 소멸자가 던지지 않는다" 규칙과 일치), 핸들러는 성공했는데 `on_end`가
+    던지면 그 예외가 전파됩니다 — 그게 보고할 유일한 진짜 오류니까요.
+  - **`plugin::plugin_manager`** (`plugin_manager.hpp`/`.cpp`): 부착된 플러그인 목록을 소유하고
+    `on_init`/`on_deinit`을 돌리는데, `listener` 자체 안에 두지 않고 `server::listener&`를
+    평범한 매개변수로 받습니다 — 의존성 순환을 피하기 위해 일부러 그런 것입니다
+    (`plugin_scope`가 이미 `router::middleware`에 의존하고, `router`는 이미 `server`에
+    의존하는데, `server`/`listener.hpp`에서 `plugin`으로 되돌아가는 의존성이 있으면 그 고리가
+    닫혀버립니다). 훅들은 자기가 직접 띄운 짧은 수명의 `io_context`(자체 스레드) 위에서
+    돌리는데, 이 코드베이스 다른 곳에서 이미 검증된 것과 정확히 같은 크로스 스레드 코루틴
+    핸드오프(`io_context::schedule()` + `async::sync_wait()`)를 재사용합니다
+    (`thread_pool::run()`, `listener`의 `SO_REUSEPORT` 없을 때 폴백) — 새 저수준 배관이 전혀
+    필요 없습니다. 호출부 형태는 전적으로 사용자 코드 쪽이고 `listener` API 변경이 없습니다:
+    `plugins.init_all(srv); srv.run(); plugins.deinit_all(srv);`(`run()`이 이미 `stop()`까지
+    블로킹하므로, 그 뒤의 `deinit_all()`은 순서가 공짜로 맞습니다).
+  - **컴파일만이 아니라 검증까지**: 새 테스트 4개(리눅스 119 → 123, Windows 115 → 119, 둘 다
+    경고 없이) — `tests/unit/test_plugin_scope.cpp`(성공 시 begin-그다음-end; 핸들러가 던져도
+    `on_end`가 여전히 실행되고 원래 예외가 여전히 전파됨 — 진짜 소켓이 아니라 `async::sync_wait`
+    로 직접 구동했는데, 실제 커넥션 디스패치 경로 어디에서도 핸들러의 uncaught 예외를 잡지
+    않아서 그런 식으로 구동하면 테스트 바이너리에서 `std::terminate`가 날 위험이 있기
+    때문입니다; 한 라우트에 `plugin_scope` 두 개가 있으면 나중에 `prepend()`된 쪽이 가장
+    바깥쪽으로 중첩되는데, 이건 새로 만든 게 아니라 물려받은 `middleware_stack` 동작입니다)와
+    `tests/integration/test_plugin_lifecycle.cpp`(진짜 `listener`로, `on_init`/`on_deinit`
+    각각이 진짜 `io_context::sleep_for(...)`를 해서 부트스트랩 컨텍스트가 진짜로 비동기
+    작업을 돌린다는 걸 증명하고, 호출 순서를 확인합니다: 어떤 요청보다도 먼저 init, `stop()`이
+    반환한 뒤에 deinit). `examples/nhttpd`의 새 `counter_plugin`(진짜 리소스를 소유하는
+    플러그인의 사소한 대역 — 자신의 클래스 주석 참고)으로 두 플랫폼 모두 수동으로 스모크
+    테스트했습니다: 반복된 `GET /counted`가 `on_begin`을 통해 요청마다 올바르게 증가하고,
+    `on_init`/`on_deinit`이 `POST /exit` 주변의 정확한 시점에 로그를 남깁니다.
 - 계획에 남은 것은 QUIC/HTTP-3(보류, 결정 #8 참고), Phase 12가 기록한 Windows에서의 OpenSSL
   빌드 환경 공백, 그리고 PLAN.md가 현재 추적하는 것들뿐입니다. 이 저장소의 향후 작업은
   여기서부터 시작합니다 — 위의 모듈 맵과 빌드 안내, 사용자 대상 API 투어는 `ReadMe.md`,

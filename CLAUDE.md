@@ -112,6 +112,9 @@ src/
   server/extensions/        extension registry, vhost, vpath, static overlay, single-file
                              serving, reverse_proxy (Phase 13)
   router/                   trie-based router (facade/route/middleware/target), successor to xfwk
+  plugin/                   plugin system (Phase 19) — server-lifecycle + per-request-scope hooks
+                             for cross-cutting functionality (e.g. a DB connection pool), built
+                             entirely on router::middleware, not a separate mechanism
   ws/                       WebSocket handshake + RFC6455 frame codec + async send/recv
   tls/                      TLS/SSL via OpenSSL (tls_context, tls_stream) — memory-BIO pattern,
                              implements io::stream so it's a drop-in transport; server *and*
@@ -1001,6 +1004,66 @@ zero compiler warnings, **on both platforms**, before moving on.
     behind and everything Phase 17 didn't already finish. Future performance work on this repo starts
     from a clean `PLAN.md` (still tracked separately from anything QUIC/HTTP-3-related or already
     listed as explicitly out of scope, both unchanged from before).
+- **Phase 19 (plugin system) — done**, at the user's explicit request, designed via `EnterPlanMode`
+  and confirmed before implementation (this is a real architecture addition, same bar as the
+  architecture-decisions log above). New `src/plugin/` + `include/nhttp/plugin/` module, purely
+  additive — `server::extension`, `router::middleware`, `tag_storage`, and `listener`'s
+  request-dispatch path are all untouched.
+  - **The problem this closes**: neither existing composition mechanism gives a piece of
+    cross-cutting functionality (the user's own example: a MySQL connection pool) a place to hook
+    the *server's own* lifecycle (once at startup, once at shutdown) while *also* getting a
+    before/after hook scoped to only the specific routes that use it, with access to that
+    request's own tag storage to hand the route a resource. `server::extension` runs its
+    `wants()`/`handle()` for *every* request at the listener level; `router::middleware` already
+    wraps a matched route's target, but nothing tied it to a plugin's own init/deinit story.
+  - **`plugin::plugin`** (`include/nhttp/plugin/plugin.hpp`): four non-pure, empty-bodied
+    coroutine hooks — `on_init(listener&, io_context&)` / `on_deinit(listener&, io_context&)` tied
+    to the server; `on_begin(request&)` / `on_end(request&)` tied to a per-request "scope". A
+    plugin overrides only what it needs. `on_init`/`on_deinit` take a live `io_context&` (not just
+    the listener) specifically so a plugin can do real async I/O in them (e.g. connecting to a
+    database) — a real gap caught and fixed *during* implementation, after the approved plan
+    initially omitted it: constructing `async::async_socket` needs a genuinely running context,
+    and nothing else available before `listener::run()` starts provides one.
+  - **`plugin::plugin_scope`** (`plugin_scope.hpp`/`.cpp`): a `router::middleware` adapter — the
+    *entire* mechanism for scoping `on_begin`/`on_end` to specific routes, reusing
+    `middleware`/`middleware_stack`/`group()`/`prepend()` verbatim (no changes to any of them).
+    `on_end` always runs to match `on_begin`, even if the wrapped handler threw — but this needed
+    a real fix mid-implementation: **C++20 forbids `co_await` inside a `catch` handler**
+    (`[expr.await]` — GCC diagnoses this directly as "await expressions are not permitted in
+    handlers"), so the first version (an async cleanup call inside `catch (...) { co_await
+    plugin_->on_end(req); throw; }`) doesn't compile. Fixed by capturing the handler's exception
+    via `std::exception_ptr` inside the `catch` (no `co_await` there), running `on_end` afterward
+    in its own `try` *outside* any catch block (where `co_await` is legal again), then
+    conditionally rethrowing — which also naturally produces better-defined secondary-exception
+    behavior than the original design would have: if the handler failed and `on_end` also throws
+    while cleaning up, `on_end`'s exception is swallowed (matches "destructors don't throw during
+    unwind"); if the handler succeeded but `on_end` throws, that exception propagates, since it's
+    the only real error to report.
+  - **`plugin::plugin_manager`** (`plugin_manager.hpp`/`.cpp`): owns the attached-plugin list and
+    drives `on_init`/`on_deinit`, taking `server::listener&` as a plain parameter rather than
+    living inside `listener` itself — deliberate, to avoid a dependency cycle (`plugin_scope`
+    already depends on `router::middleware`, and `router` already depends on `server`; a
+    dependency from `server`/`listener.hpp` back into `plugin` would close that loop). Drives the
+    hooks on a short-lived `io_context` it spins up itself (own thread), reusing exactly the
+    cross-thread coroutine hand-off (`io_context::schedule()` + `async::sync_wait()`) already
+    proven elsewhere in this codebase (`thread_pool::run()`, `listener`'s no-`SO_REUSEPORT`
+    fallback) — no new low-level plumbing needed. Call-site shape is entirely user-code-side, no
+    `listener` API change: `plugins.init_all(srv); srv.run(); plugins.deinit_all(srv);` (`run()`
+    already blocks until `stop()`, so `deinit_all()` after it is correctly ordered for free).
+  - **Verified, not just compiled**: 4 new tests (119 → 123 on Linux, 115 → 119 on Windows, both
+    warning-free) — `tests/unit/test_plugin_scope.cpp` (begin-then-end on success; `on_end` still
+    fires and the original exception still propagates when the handler throws, driven via
+    `async::sync_wait` directly rather than a real socket, since an uncaught exception from a
+    handler isn't caught anywhere in the real connection-dispatch path and would risk
+    `std::terminate` in the test binary if driven that way; two `plugin_scope`s on one route nest
+    with the later-`prepend()`-ed one outermost, inherited `middleware_stack` behavior, not new)
+    and `tests/integration/test_plugin_lifecycle.cpp` (a real `listener`, `on_init`/`on_deinit`
+    each doing a real `io_context::sleep_for(...)` to prove the bootstrap context genuinely drives
+    async work, asserting call order: init before any request, deinit after `stop()` returns).
+    Manually smoke-tested on both platforms with `examples/nhttpd`'s new `counter_plugin` (a
+    trivial stand-in for a real resource-owning plugin — see its class comment): repeated
+    `GET /counted` increments correctly across requests via `on_begin`, and `on_init`/`on_deinit`
+    log at the right points around `POST /exit`.
 - Nothing left on the plan beyond QUIC/HTTP-3 (deferred, see decision #8), Phase 12's noted
   OpenSSL-on-Windows build-environment gap, and whatever `PLAN.md` currently tracks as open.
   Future work on this repo starts from here — see the module map and build instructions above,

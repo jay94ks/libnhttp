@@ -210,7 +210,7 @@ router->group([](facade_ptr inner) {
 		co_return make_response(std::move(body));
 	}));
 
-	inner->param(":user", [](const std::string& name) {
+	inner->param(":user", [](std::string_view name) {
 		return name == "jay" || name == "kay";
 	});
 })->prepend(std::make_shared<my_logging_middleware>());
@@ -221,6 +221,61 @@ srv.extends(router);
 경로 세그먼트별 매칭 우선순위는 **static 자식 → 가장 깊게 매칭되는 파라미터 자식 → wildcard**
 순서입니다 — 이 정확한 우선순위 규칙은 실제로 과거에 출시됐던 버그의 원인이었고, 전용 회귀
 테스트(`tests/unit/test_router_route.cpp`)로 고정되어 있습니다.
+
+## 플러그인 시스템
+
+서버 자신의 생명주기(예: 시작 시 한 번 만들고 종료 시 한 번 정리하는 DB 커넥션 풀)에 걸 자리와,
+그걸 쓰는 특정 라우트에만 스코프된 전/후 훅 — 그 요청 자신의 태그 저장소에 접근해 라우트에
+리소스를 건네주는 것 — 을 둘 다 필요로 하는 교차 관심사를 위해서는, `nhttp::plugin::plugin`을
+구현하고 두 가지 방식으로 붙이세요: 서버에는(`on_init`/`on_deinit`을 위해) `plugin_manager`로,
+특정 라우트에는(`on_begin`/`on_end`를 위해) `plugin_scope`로 — 다른 미들웨어에 쓰는 것과 같은
+`router::middleware`/`prepend()` 메커니즘입니다:
+
+```cpp
+struct db_connection_tag { mysql_connection conn; };
+
+class mysql_plugin final : public plugin::plugin {
+public:
+	task<void> on_init(listener&, io_context& ctx) override {
+		pool_ = co_await mysql_pool::connect(ctx, "db.internal", ...);
+	}
+
+	task<void> on_begin(request& req) override {
+		req.tags.ensure<db_connection_tag>().conn = co_await pool_->acquire();
+	}
+
+	task<void> on_end(request& req) override {
+		co_await pool_->release(std::move(req.tags.get<db_connection_tag>()->conn));
+	}
+
+private:
+	std::shared_ptr<mysql_pool> pool_;
+};
+
+auto mysql = std::make_shared<mysql_plugin>();
+plugin::plugin_manager plugins;
+plugins.attach(mysql);
+
+router->group([](facade_ptr inner) {
+	inner->get(":user/profile", target_by([](request& req) {
+		auto& conn = req.tags.get<db_connection_tag>()->conn; // mysql_plugin::on_begin이 설정함
+		return make_response(query_profile(conn, route_of(req).captures.at(":user")));
+	}));
+})->prepend(std::make_shared<plugin::plugin_scope>(mysql));
+
+srv.extends(router);
+
+plugins.init_all(srv);
+srv.run();              // stop()까지 블로킹
+plugins.deinit_all(srv);
+```
+
+`on_end`는 감싸인 핸들러가 던지더라도 `on_begin`과 짝을 맞춰 항상 실행되므로, 핸들러가 어떻게
+끝났든 `on_begin`이 획득한 것을 플러그인이 확실히 해제하도록 맡길 수 있습니다.
+`server::extension`(리스너 수준에서 *모든* 요청마다 시도됨)과 달리, `on_begin`/`on_end`는
+`plugin_scope`로 명시적으로 옵트인한 라우트만 감쌉니다 — 서버 전역 설정이 없는 플러그인은
+`on_init`/`on_deinit`을 통째로 건너뛸 수 있고, 요청별 상태가 없는 플러그인은
+`on_begin`/`on_end`를 건너뛸 수 있습니다.
 
 ## WebSocket
 

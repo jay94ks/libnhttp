@@ -15,7 +15,11 @@
 #include "nhttp/server/extensions/overlay.hpp"
 #include "nhttp/server/extensions/websocket_endpoint.hpp"
 #include "nhttp/router/router.hpp"
+#include "nhttp/plugin/plugin.hpp"
+#include "nhttp/plugin/plugin_scope.hpp"
+#include "nhttp/plugin/plugin_manager.hpp"
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -40,6 +44,39 @@ namespace {
 				co_await ws->send_binary(msg->data.data(), msg->data.size());
 		}
 	}
+
+	/* what a real plugin (e.g. one wrapping a MySQL connection pool) would
+	 * stash into a request's tag storage in on_begin, for the wrapped handler
+	 * below to read back out. */
+	struct hit_count_tag {
+		std::size_t value = 0;
+	};
+
+	/* a trivial stand-in for a real resource-owning plugin (a DB connection
+	 * pool, etc.) -- on_init/on_deinit mark server-wide setup/teardown,
+	 * on_begin hands the wrapped handler a per-request value via req.tags,
+	 * on_end is where a real plugin would release whatever on_begin acquired.
+	 * See "/counted" below for how a route opts into this plugin's scope. */
+	class counter_plugin final : public plugin::plugin {
+	public:
+		async::task<void> on_init(listener&, async::io_context&) override {
+			std::puts("counter_plugin: on_init");
+			co_return;
+		}
+
+		async::task<void> on_deinit(listener&, async::io_context&) override {
+			std::puts("counter_plugin: on_deinit");
+			co_return;
+		}
+
+		async::task<void> on_begin(request& req) override {
+			req.tags.ensure<hit_count_tag>().value = ++hits_;
+			co_return;
+		}
+
+	private:
+		std::atomic<std::size_t> hits_{ 0 };
+	};
 
 }
 
@@ -82,6 +119,18 @@ int main(int argc, char** argv) {
 		srv.stop();
 		return make_response("server exiting...");
 	}));
+
+	// --- plugin system demo: a route scoped to counter_plugin's on_begin/
+	// on_end (see its class comment above) ---
+	auto counter = std::make_shared<counter_plugin>();
+	plugin::plugin_manager plugins;
+	plugins.attach(counter);
+
+	api->group([&](facade_ptr inner) {
+		inner->get("counted", target_by([](request& req) {
+			return make_response("hit #" + std::to_string(req.tags.get<hit_count_tag>()->value));
+		}));
+	})->prepend(std::make_shared<plugin::plugin_scope>(counter));
 
 	api->group([](facade_ptr inner) {
 		inner->get(":user/profile", target_by([](request& req) {
@@ -131,6 +180,7 @@ int main(int argc, char** argv) {
 
 	std::printf("nhttpd listening on 127.0.0.1:%u and [::1]:%u, serving '%s'\n", port, port, serve_dir.c_str());
 	std::printf("try: curl http://127.0.0.1:%u/whoami\n", port);
+	std::printf("try: curl http://127.0.0.1:%u/counted\n", port);
 
 #ifdef NHTTP_HAVE_TLS
 	if (argc > 4) {
@@ -146,7 +196,9 @@ int main(int argc, char** argv) {
 	}
 #endif
 
+	plugins.init_all(srv);
 	srv.run(); // blocks until POST /exit calls srv.stop()
+	plugins.deinit_all(srv);
 
 	return 0;
 }
