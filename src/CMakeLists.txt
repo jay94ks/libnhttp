@@ -80,7 +80,13 @@ target_compile_features(nhttp PUBLIC cxx_std_20)
 
 target_include_directories(nhttp
 	PUBLIC
-		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+		# PROJECT_SOURCE_DIR (this file's nearest enclosing project(), i.e.
+		# libnhttp's own top-level CMakeLists.txt), not CMAKE_SOURCE_DIR
+		# (the outermost project passed to `cmake -S`) - the latter breaks
+		# when this library is add_subdirectory()'d into a larger build
+		# (e.g. p2pid's), since it would then resolve against the OUTER
+		# project's source root instead of libnhttp's own include/.
+		$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
 		$<INSTALL_INTERFACE:include>
 	PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}
